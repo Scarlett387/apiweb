@@ -1,0 +1,11 @@
+name = "nav-api"
+main = "apps/api/worker.ts"
+compatibility_date = "2026-11-01"
+node_compat = true
+
+# 把 Vercel 里的所有环境变量原封不动填到下面
+[vars]
+# JWT_SECRET = "你的密钥"
+# D1_DATABASE_ID = "你的D1数据库ID"
+# D1_API_TOKEN = "你的D1 API令牌"
+# 其他所有变量都按 变量名 = "值" 格式添加
