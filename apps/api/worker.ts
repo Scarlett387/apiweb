@@ -1,4 +1,4 @@
-import fastify from './server'
+import fastify from './server.js'
 
 export default {
   async fetch(request: Request, env: Record<string, any>) {
