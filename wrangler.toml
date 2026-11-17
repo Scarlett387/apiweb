@@ -1,7 +1,9 @@
-name = "nav-api"
+name = "apiwebv1"
 main = "worker.ts"
 compatibility_date = "2026-11-01"
 compatibility_flags = ["nodejs_compat"]
 
 [vars]
-# 你的环境变量保持不变
+# JWT_SECRET = "x73Kg8psZtQyqdkr9KXFoCDESZQ4fjpyu7qaJDWGa19b59d3"
+# D1_DATABASE_ID = "646fa7fa-b9aa-4641-83cb-edb5be462935"
+# D1_API_TOKEN = "cfat_x73Kg8psZtQyqdkr9KXFoCDESZQ4fjpyu7qaJDWGa19b59d3"
