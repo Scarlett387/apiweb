@@ -1,5 +1,5 @@
 name = "nav-api"
-main = "apps/api/worker.ts"
+main = "worker.ts"
 compatibility_date = "2026-11-01"
 node_compat = true
 
