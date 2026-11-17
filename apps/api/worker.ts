@@ -1,4 +1,7 @@
-import fastify from './server.js'
+import * as serverModule from './server.js'
+
+// 兼容原项目的导出格式（命名导出/默认导出都能匹配）
+const fastify = serverModule.fastify || serverModule.default
 
 export default {
   async fetch(request: Request, env: Record<string, any>) {
