@@ -1,6 +1,7 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "globalDependencies": ["**/.env.*local", "tsconfig.json"],
+  "globalEnv": ["VITE_API_BASE_URL", "VITE_USE_HASH_ROUTER"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
@@ -30,3 +31,4 @@
     }
   }
 }
+
