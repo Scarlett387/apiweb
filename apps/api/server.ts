@@ -241,3 +241,4 @@ signals.forEach(signal => {
     process.exit(0)
   })
 })
+export { app }
