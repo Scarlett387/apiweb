@@ -5,7 +5,7 @@ import {
   type PasswordResetSender
 } from '@nav/core'
 import type { Logger } from '@nav/logger'
-import nodemailer, { type Transporter } from 'nodemailer'
+import type { Transporter } from 'nodemailer'
 
 export interface SmtpVerificationEmailSenderOptions {
   user?: string
@@ -58,16 +58,14 @@ export class SmtpVerificationEmailSender implements EmailVerificationSender, Pas
     }
 
     try {
-      await this.getTransporter(user, password).sendMail({
-        from: { name: fromName, address: user },
+      await this.deliver(user, password, {
         to: message.to,
         subject: `【${fromName}】重置登录密码`,
         html: this.buildResetHtml(message),
-        text: this.buildResetText(message),
-        messageId: `<${message.idempotencyKey}@${this.getEmailDomain(user)}>`
+        text: this.buildResetText(message)
       })
     } catch (error) {
-      logger.error({ err: error }, 'Failed to send password reset email through SMTP')
+      logger.error({ err: error }, 'Failed to send password reset email')
       throw new AppError('重置邮件发送失败，请稍后重试', 'EMAIL_DELIVERY_FAILED', 502)
     }
   }
@@ -90,22 +88,71 @@ export class SmtpVerificationEmailSender implements EmailVerificationSender, Pas
     }
 
     try {
-      await this.getTransporter(user, password).sendMail({
-        from: { name: fromName, address: user },
+      await this.deliver(user, password, {
         to: message.to,
         subject: `【${fromName}】验证邮箱并启用密码登录`,
         html: this.buildHtml(message),
-        text: this.buildText(message),
-        messageId: `<${message.idempotencyKey}@${this.getEmailDomain(user)}>`
+        text: this.buildText(message)
       })
     } catch (error) {
-      logger.error({ err: error }, 'Failed to send email binding verification through SMTP')
+      logger.error({ err: error }, 'Failed to send email binding verification')
       throw new AppError('验证邮件发送失败，请稍后重试', 'EMAIL_DELIVERY_FAILED', 502)
     }
   }
 
-  private getTransporter(user: string, password: string): Transporter {
+  /**
+   * 统一发信入口：
+   * - 密码填 Resend API Key（re_ 开头）时走 Resend HTTP API——
+   *   这是 Cloudflare Workers 上唯一可用的发信方式（Workers 不支持 SMTP）。
+   * - 否则走传统 SMTP（网易 163），适用于 Node/Docker 部署。
+   */
+  private async deliver(
+    user: string,
+    password: string,
+    mail: { to: string; subject: string; html: string; text: string }
+  ): Promise<void> {
+    if (password.startsWith('re_')) {
+      await this.sendViaResend(user, password, mail)
+      return
+    }
+    await (
+      await this.getTransporter(user, password)
+    ).sendMail({
+      from: { name: this.options.fromName, address: user },
+      ...mail,
+      messageId: `<${crypto.randomUUID()}@${this.getEmailDomain(user)}>`
+    })
+  }
+
+  private async sendViaResend(
+    user: string,
+    apiKey: string,
+    mail: { to: string; subject: string; html: string; text: string }
+  ): Promise<void> {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: { name: this.options.fromName, address: user },
+        to: [mail.to],
+        subject: mail.subject,
+        html: mail.html,
+        text: mail.text
+      })
+    })
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '')
+      throw new Error(`Resend API error ${response.status}: ${detail}`)
+    }
+  }
+
+  private async getTransporter(user: string, password: string): Promise<Transporter> {
     if (!this.transporter) {
+      // 按需加载 nodemailer：Workers 运行时不加载 SMTP 栈
+      const nodemailer = (await import('nodemailer')).default
       this.transporter = nodemailer.createTransport({
         ...NETEASE_SMTP_CONFIG,
         auth: {

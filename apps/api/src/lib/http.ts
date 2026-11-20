@@ -1,17 +1,16 @@
 import axios from 'axios'
 import axiosRetry from 'axios-retry'
-import { config } from '@nav/config'
 
 // Create a centralized Axios instance
+// 使用 fetch 适配器：在 Cloudflare Workers 上没有 node:http 客户端栈，
+// fetch 适配器在 Node/Docker 环境同样可用（Node 18+ 内置 fetch）。
 export const httpClient = axios.create({
+  adapter: 'fetch',
   timeout: 15000,
   headers: {
     'User-Agent': 'DIY-Nav'
   }
 })
-
-// Axios automatically respects HTTP_PROXY and HTTPS_PROXY environment variables.
-// No manual agent configuration is needed for Big Tech standard deployments.
 
 // Configure Resilience (Retries)
 axiosRetry(httpClient, {

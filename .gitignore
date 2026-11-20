@@ -29,3 +29,9 @@ pnpm-debug.log*
 
 .turbo/**
 .playwright-mcp/**
+
+# wrangler 本地密钥
+.dev.vars
+
+# wrangler 本地测试状态
+.wrangler/

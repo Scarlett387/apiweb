@@ -1,0 +1,31 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "diy-nav",
+  "main": "apps/api/dist/worker.js",
+  "compatibility_date": "2025-12-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // 修复：仓库里同时存在 pino@9 与 pino@10，Workers 打包时双实例互不兼容
+  // （fastify 的 logger-pino 读 pino.symbols 报 undefined）。统一钉到单文件解决。
+  "alias": {
+    "pino": "./node_modules/.pnpm/pino@10.1.0/node_modules/pino/pino.js"
+  },
+  // 前端静态资源：直接由 Cloudflare 边缘托管，未匹配到文件的请求（/api/* 等）进入 Worker
+  "assets": {
+    "directory": "apps/web/dist",
+    "not_found_handling": "single-page-application"
+  },
+  // D1 数据库原生绑定：部署前把 database_id 换成你自己的 D1 数据库 ID
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "diy-nav-db",
+      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+    }
+  ],
+  "vars": {
+    "NODE_ENV": "production"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

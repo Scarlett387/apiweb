@@ -1,7 +1,12 @@
 import type { FastifyBaseLogger } from 'fastify'
 import type { Readable } from 'stream'
 
-import { createDatabaseClient, type DatabaseClient } from '@nav/database'
+import {
+  createDatabaseClient,
+  type DatabaseClient,
+  type DatabaseExecuteResult,
+  type DatabaseStatement
+} from '@nav/database'
 import { LocalClient, type StorageClient } from '@nav/storage'
 import {
   BackupService,
@@ -57,7 +62,46 @@ function createConfiguredDatabaseClient(): DatabaseClient {
   })
 }
 
-export const databaseClient = createConfiguredDatabaseClient()
+/**
+ * 可热切换的数据库客户端代理。
+ * - Node/Vercel 运行时：保持内部的 HTTP D1 / MySQL 客户端不变。
+ * - Cloudflare Workers 运行时：worker 入口在拿到 env.DB 绑定后，
+ *   通过 setClient() 热切换为 D1BindingClient（原生绑定，免 Token）。
+ * 仿照 DynamicStorageClient 的热切换模式。
+ */
+export class DynamicDatabaseClient implements DatabaseClient {
+  private inner: DatabaseClient
+
+  constructor(initialClient: DatabaseClient) {
+    this.inner = initialClient
+  }
+
+  setClient(newClient: DatabaseClient): void {
+    this.inner = newClient
+  }
+
+  get dialect() {
+    return this.inner.dialect
+  }
+
+  first<T = unknown>(sql: string, params?: unknown[]): Promise<T | null> {
+    return this.inner.first<T>(sql, params)
+  }
+
+  all<T = unknown>(sql: string, params?: unknown[]): Promise<T[]> {
+    return this.inner.all<T>(sql, params)
+  }
+
+  execute(sql: string, params?: unknown[]): Promise<DatabaseExecuteResult> {
+    return this.inner.execute(sql, params)
+  }
+
+  batch(statements: DatabaseStatement[]): Promise<DatabaseExecuteResult[]> {
+    return this.inner.batch(statements)
+  }
+}
+
+export const databaseClient = new DynamicDatabaseClient(createConfiguredDatabaseClient())
 
 // --- Dynamic Storage Client Proxy ---
 export class DynamicStorageClient implements StorageClient {

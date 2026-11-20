@@ -1,0 +1,217 @@
+diff --git a/lib/constrainer.js b/lib/constrainer.js
+index 6cd9df65c55fa9cfdc115a39591cbcc29b1f4835..090a3e1685e8f8087e75c13feb796a31e7dbe779 100644
+--- a/lib/constrainer.js
++++ b/lib/constrainer.js
+@@ -142,28 +142,33 @@ class Constrainer {
+   // Optimization: build a fast function for deriving the constraints for all the strategies at once. We inline the definitions of the version constraint and the host constraint for performance.
+   // If no constraining strategies are in use (no routes constrain on host, or version, or any custom strategies) then we don't need to derive constraints for each route match, so don't do anything special, and just return undefined
+   // This allows us to not allocate an object to hold constraint values if no constraints are defined.
++  // PATCHED for Cloudflare Workers: workers disallow `new Function` (code generation).
+   _buildDeriveConstraints () {
+     if (this.strategiesInUse.size === 0) return
+ 
+-    const lines = ['return {']
+-
++    const entries = []
+     for (const key of this.strategiesInUse) {
+       const strategy = this.strategies[key]
+       // Optimization: inline the derivation for the common built in constraints
+       if (!strategy.isCustom) {
+         if (key === 'version') {
+-          lines.push('   version: req.headers[\'accept-version\'],')
++          entries.push(['version', req => req.headers['accept-version']])
+         } else {
+-          lines.push('   host: req.headers.host || req.headers[\':authority\'],')
++          entries.push(['host', req => req.headers.host || req.headers[':authority']])
+         }
+       } else {
+-        lines.push(`  ${strategy.name}: this.strategies.${key}.deriveConstraint(req, ctx),`)
++        const custom = strategy
++        entries.push([strategy.name, (req, ctx) => custom.deriveConstraint(req, ctx)])
+       }
+     }
+ 
+-    lines.push('}')
+-
+-    this.deriveSyncConstraints = new Function('req', 'ctx', lines.join('\n')).bind(this) // eslint-disable-line
++    this.deriveSyncConstraints = (req, ctx) => {
++      const derived = {}
++      for (const [key, derive] of entries) {
++        derived[key] = derive(req, ctx)
++      }
++      return derived
++    }
+   }
+ }
+ 
+diff --git a/lib/handler-storage.js b/lib/handler-storage.js
+index d55897b10d6fbe53bddccbee848f2453c9c6b8d4..07052816700e2c0bcad2745379910dc1a5a08a0b 100644
+--- a/lib/handler-storage.js
++++ b/lib/handler-storage.js
+@@ -61,21 +61,17 @@ class HandlerStorage {
+     }
+   }
+ 
++  // PATCHED for Cloudflare Workers: workers disallow `new Function` (code generation).
++  // This is an equivalent, non-compiled implementation.
+   _compileCreateParamsObject (params) {
+-    const fnBody = []
+-
+-    fnBody.push('const fn = function _createParamsObject (paramsArray) {')
+-
+-    fnBody.push('const params = new NullObject()')
+-    for (let i = 0; i < params.length; i++) {
+-      fnBody.push(`params['${params[i]}'] = paramsArray[${i}]`)
++    const keys = params.slice()
++    return function _createParamsObject (paramsArray) {
++      const params = new NullObject()
++      for (let i = 0; i < keys.length; i++) {
++        params[keys[i]] = paramsArray[i]
++      }
++      return params
+     }
+-    fnBody.push('return params')
+-    fnBody.push('}')
+-
+-    fnBody.push('return fn')
+-
+-    return new Function('NullObject', fnBody.join('\n'))(NullObject)  // eslint-disable-line
+   }
+ 
+   _getHandlerMatchingConstraints () {
+@@ -116,6 +112,8 @@ class HandlerStorage {
+   // We do this by asking each constraint store which handler indexes match the given constraint value for each store. Trickily, the handlers that a store says match are the handlers constrained by that store, but handlers that aren't constrained at all by that store could still match just fine. So, each constraint store can only describe matches for it, and it won't have any bearing on the handlers it doesn't care about. For this reason, we have to ask each stores which handlers match and track which have been matched (or not cared about) by all of them.
+   // We use bitmaps to represent these lists of matches so we can use bitwise operations to implement this efficiently. Bitmaps are cheap to allocate, let us implement this masking behaviour in one CPU instruction, and are quite compact in memory. We start with a bitmap set to all 1s representing every handler that is a match candidate, and then for each constraint, see which handlers match using the store, and then mask the result by the mask of handlers that that store applies to, and bitwise AND with the candidate list. Phew.
+   // We consider all this compiling function complexity to be worth it, because the naive implementation that just loops over the handlers asking which stores match is quite a bit slower.
++  // PATCHED for Cloudflare Workers: workers disallow `new Function` (code generation).
++  // Equivalent naive per-handler constraint matching (semantics identical to the compiled version).
+   _compileGetHandlerMatchingConstraints (constrainer) {
+     this.constrainedHandlerStores = {}
+ 
+@@ -126,48 +124,57 @@ class HandlerStorage {
+       this._buildConstraintStore(store, constraint)
+     }
+ 
+-    const lines = []
+-    lines.push(`
+-    let candidates = ${(1 << this.handlers.length) - 1}
+-    let mask, matches
+-    `)
+-    for (const constraint of this.constraints) {
+-      // Setup the mask for indexes this constraint applies to. The mask bits are set to 1 for each position if the constraint applies.
+-      lines.push(`
+-      mask = ${this._constrainedIndexBitmask(constraint)}
+-      value = derivedConstraints.${constraint}
+-      `)
+-
+-      // If there's no constraint value, none of the handlers constrained by this constraint can match. Remove them from the candidates.
+-      // If there is a constraint value, get the matching indexes bitmap from the store, and mask it down to only the indexes this constraint applies to, and then bitwise and with the candidates list to leave only matching candidates left.
+-      const strategy = constrainer.strategies[constraint]
+-      const matchMask = strategy.mustMatchWhenDerived ? 'matches' : '(matches | mask)'
+-
+-      lines.push(`
+-      if (value === undefined) {
+-        candidates &= mask
+-      } else {
+-        matches = this.constrainedHandlerStores.${constraint}.get(value) || 0
+-        candidates &= ${matchMask}
+-      }
+-      if (candidates === 0) return null;
+-      `)
+-    }
+-
+-    // There are some constraints that can be derived and marked as "must match", where if they are derived, they only match routes that actually have a constraint on the value, like the SemVer version constraint.
+-    // An example: a request comes in for version 1.x, and this node has a handler that matches the path, but there's no version constraint. For SemVer, the find-my-way semantics do not match this handler to that request.
+-    // This function is used by Nodes with handlers to match when they don't have any constrained routes to exclude request that do have must match derived constraints present.
++    // Constraints that must match when derived but are not present on this node
++    const mustMatchWhenDerived = []
+     for (const constraint in constrainer.strategies) {
+       const strategy = constrainer.strategies[constraint]
+       if (strategy.mustMatchWhenDerived && !this.constraints.includes(constraint)) {
+-        lines.push(`if (derivedConstraints.${constraint} !== undefined) return null`)
++        mustMatchWhenDerived.push(constraint)
+       }
+     }
+ 
+-    // Return the first handler who's bit is set in the candidates https://stackoverflow.com/questions/18134985/how-to-find-index-of-first-set-bit
+-    lines.push('return this.handlers[Math.floor(Math.log2(candidates))]')
++    this._getHandlerMatchingConstraints = function (derivedConstraints) {
++      const handlers = this.handlers
++      for (let i = 0; i < handlers.length; i++) {
++        const handler = handlers[i]
++        let matched = true
++
++        for (const constraint of this.constraints) {
++          const value = derivedConstraints[constraint]
++          if (value === undefined) {
++            if (handler.constraints[constraint] !== undefined) {
++              matched = false
++              break
++            }
++          } else if (handler.constraints[constraint] !== undefined) {
++            const store = this.constrainedHandlerStores[constraint]
++            if (!store) {
++              matched = false
++              break
++            }
++            const matches = store.get(value) || 0
++            if (!((matches >> i) & 1)) {
++              matched = false
++              break
++            }
++          }
++        }
++
++        if (!matched) continue
+ 
+-    this._getHandlerMatchingConstraints = new Function('derivedConstraints', lines.join('\n')) // eslint-disable-line
++        let bad = false
++        for (const constraint of mustMatchWhenDerived) {
++          if (derivedConstraints[constraint] !== undefined) {
++            bad = true
++            break
++          }
++        }
++        if (bad) continue
++
++        return handler
++      }
++      return null
++    }
+   }
+ }
+ 
+diff --git a/lib/node.js b/lib/node.js
+index f1daea7e07927373c05a5ea684777f230ecd242e..703a4e6859f4c413bd9619ccc9631e02e9b80191 100644
+--- a/lib/node.js
++++ b/lib/node.js
+@@ -183,18 +183,24 @@ class StaticNode extends ParentNode {
+     return node
+   }
+ 
++  // PATCHED for Cloudflare Workers: workers disallow `new Function` (code generation).
+   _compilePrefixMatch () {
+     if (this.prefix.length === 1) {
+       this.matchPrefix = () => true
+       return
+     }
+ 
+-    const lines = []
+-    for (let i = 1; i < this.prefix.length; i++) {
+-      const charCode = this.prefix.charCodeAt(i)
+-      lines.push(`path.charCodeAt(i + ${i}) === ${charCode}`)
++    const prefix = this.prefix
++    const charCodes = []
++    for (let i = 1; i < prefix.length; i++) {
++      charCodes.push([i, prefix.charCodeAt(i)])
++    }
++    this.matchPrefix = (path, i) => {
++      for (let k = 0; k < charCodes.length; k++) {
++        if (path.charCodeAt(i + charCodes[k][0]) !== charCodes[k][1]) return false
++      }
++      return true
+     }
+-    this.matchPrefix = new Function('path', 'i', `return ${lines.join(' && ')}`) // eslint-disable-line
+   }
+ }
+ 

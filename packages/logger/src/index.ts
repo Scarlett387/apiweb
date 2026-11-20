@@ -25,7 +25,12 @@ const getEnv = (key: string) => {
 const safeNodeEnv = getEnv('NODE_ENV')
 const safeLogLevel = getEnv('LOG_LEVEL')
 
-const isDev = safeNodeEnv === 'development' || safeNodeEnv === 'test'
+// Cloudflare Workers（workerd）不支持 pino 传输器（依赖 worker 线程与文件系统），
+// 自动识别并降级为纯 stdout JSON 日志
+const isCloudflareWorkers =
+  typeof navigator !== 'undefined' && navigator.userAgent === 'Cloudflare-Workers'
+
+const isDev = (safeNodeEnv === 'development' || safeNodeEnv === 'test') && !isCloudflareWorkers
 const logLevel = safeLogLevel || (isDev ? 'debug' : 'info')
 
 // Common configuration for data redaction

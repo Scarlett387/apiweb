@@ -1,0 +1,217 @@
+import Fastify, { type FastifyServerOptions } from 'fastify'
+import cors from '@fastify/cors'
+import staticPlugin from '@fastify/static'
+import { validatorCompiler, serializerCompiler, ZodTypeProvider } from 'fastify-type-provider-zod'
+import { join } from 'path'
+import { config } from '@nav/config'
+import { databaseClient, initServices } from './src/services.js'
+import { isDatabaseUnavailableError } from '@nav/database'
+import { AppError } from '@nav/core'
+import { configs } from '@nav/logger'
+import iconRoutes from './src/routes/icon.js'
+import backupRoutes from './src/routes/backup.js'
+import syncRoutes from './src/routes/sync.route.js'
+import authRoutes from './src/routes/auth.route.js'
+import aiRoutes from './src/routes/ai.route.js'
+import adminRoutes from './src/routes/admin.route.js'
+import siteRoutes from './src/routes/site.route.js'
+import { httpClient } from './src/lib/http.js'
+import { isNetworkUnavailableError, toFrameworkClientError } from './src/lib/infra-error.js'
+import { OAuthProviderConfigService } from './src/lib/oauth-provider-config.js'
+import authRenewalPlugin from './src/plugins/auth-renewal.js'
+import jwt from '@fastify/jwt'
+import rateLimit from '@fastify/rate-limit'
+import helmet from '@fastify/helmet'
+import cookie from '@fastify/cookie'
+import { AUTH_COOKIE_NAME } from './src/lib/auth-cookie.js'
+
+/**
+ * Build the Fastify app (runtime-agnostic).
+ *
+ * - Node/Docker/Vercel: server.ts 调用本函数并监听端口，registerStatic=true。
+ * - Cloudflare Workers: worker.ts 调用本函数，静态文件由 Workers Assets 托管，
+ *   registerStatic=false（@fastify/static 依赖本地文件系统，Workers 没有）。
+ */
+export async function buildApp(
+  options: {
+    registerStatic?: boolean
+    staticRoot?: string
+    /** 覆盖日志器；Workers 上必须传 false（pino 传输器在 workerd 不可用） */
+    logger?: FastifyServerOptions['logger']
+  } = {}
+) {
+  const { registerStatic = false, staticRoot, logger = configs.node } = options
+
+  // Fastify app
+
+  const app = Fastify({
+    logger
+  }).withTypeProvider<ZodTypeProvider>()
+
+  // Setup Zod validation
+  app.setValidatorCompiler(validatorCompiler)
+  app.setSerializerCompiler(serializerCompiler)
+
+  app.setErrorHandler((error, request, reply) => {
+    // Handle AppError：业务语义错误，直接透出
+    if (error instanceof AppError) {
+      return reply.status(error.statusCode).send({
+        success: false,
+        code: error.code,
+        message: error.message
+      })
+    }
+
+    // 数据库不可用：503 + 泛化文案（不向前端暴露"数据库"等内部实现细节），
+    // 原始错误与具体原因只进日志
+    if (isDatabaseUnavailableError(error)) {
+      request.log.error({ err: error, url: request.url }, 'Database unavailable')
+      return reply.status(503).send({
+        success: false,
+        code: 'SERVICE_UNAVAILABLE',
+        message: '服务暂时不可用，请稍后重试'
+      })
+    }
+
+    // 其它外部依赖网络失败（SMTP、OAuth 上游等），同样只进日志
+    if (isNetworkUnavailableError(error)) {
+      request.log.error({ err: error, url: request.url }, 'Dependency unavailable')
+      return reply.status(503).send({
+        success: false,
+        code: 'SERVICE_UNAVAILABLE',
+        message: '服务暂时不可用，请稍后重试'
+      })
+    }
+
+    // Handle Zod Validation Errors
+    // Fastify validation errors typically have a 'validation' property
+    interface FastifyValidationError extends Error {
+      validation: unknown[] // or specific validation error shape
+      statusCode?: number
+    }
+
+    const validationError = error as FastifyValidationError
+    if (validationError.validation) {
+      return reply.status(400).send({
+        success: false,
+        code: 'VALIDATION_ERROR',
+        message: '请求参数不合法',
+        details: validationError.validation
+      })
+    }
+
+    // Fastify 框架自带 4xx（空 body、非法 JSON、限流等），避免被误报成 500
+    const frameworkError = toFrameworkClientError(error)
+    if (frameworkError) {
+      request.log.warn({ err: error, url: request.url }, 'Framework client error')
+      return reply.status(frameworkError.statusCode).send({
+        success: false,
+        code: frameworkError.code,
+        message: frameworkError.message
+      })
+    }
+
+    // Handle generic errors
+    request.log.error({ err: error, url: request.url }, 'Unhandled error')
+    return reply.status(500).send({
+      success: false,
+      code: 'INTERNAL_SERVER_ERROR',
+      message: '服务器内部错误，请稍后重试'
+    })
+  })
+
+  // 404 走 notFoundHandler，不经过 setErrorHandler，需要单独统一信封
+  app.setNotFoundHandler((request, reply) => {
+    request.log.warn({ url: request.url }, 'Route not found')
+    return reply.status(404).send({
+      success: false,
+      code: 'NOT_FOUND',
+      message: '接口不存在'
+    })
+  })
+
+  // Plugins
+  void app.register(cors, {
+    origin: true,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'],
+    allowedHeaders: ['content-type', 'authorization']
+  })
+
+  // Security Headers
+  void app.register(helmet, {
+    contentSecurityPolicy: false
+  })
+
+  void app.register(rateLimit, {
+    global: false
+  })
+
+  void app.register(cookie)
+
+  void app.register(jwt, {
+    secret: config.auth.jwtSecret,
+    cookie: {
+      cookieName: AUTH_COOKIE_NAME,
+      signed: false
+    },
+    sign: {
+      expiresIn: '7d'
+    }
+  })
+
+  app.decorate('authenticate', async function (req, reply) {
+    try {
+      await req.jwtVerify()
+    } catch (err) {
+      app.log.warn({ err, ip: req.ip }, 'JWT verification failed')
+      return reply.status(401).send({
+        success: false,
+        code: 'UNAUTHORIZED',
+        message: '登录状态已失效，请重新登录'
+      })
+    }
+  })
+
+  if (registerStatic) {
+    await app.register(staticPlugin, {
+      root: staticRoot ?? join(process.cwd(), 'public'),
+      prefix: '/',
+      constraints: {}
+    })
+  }
+
+  // Health Checks
+  app.get('/healthz', async () => ({ status: 'ok' }))
+  app.get('/readyz', async () => ({ status: 'ready' }))
+
+  // Register Routes
+  // 注意：Workers（workerd）环境下逐个 await register 会触发多次部分 boot，
+  // 导致 encapsulation 前缀逐级累加（/api/api/api/...）。这里只入队不等待，
+  // 统一由后续 app.ready() 完成装配（Node/Vercel/Docker 行为不变）。
+  void app.register(iconRoutes, { prefix: '/api' })
+  void app.register(backupRoutes, { prefix: '/api' })
+  void app.register(syncRoutes, { prefix: '/api' })
+  const oauthProviderConfigService = new OAuthProviderConfigService(
+    databaseClient,
+    httpClient,
+    config.auth.oauthConfigEncryptionKey
+  )
+  app.decorate('oauthProviderConfigService', oauthProviderConfigService)
+
+  void app.register(authRoutes, { prefix: '/api' })
+  void app.register(aiRoutes, { prefix: '/api' })
+  void app.register(adminRoutes, { prefix: '/api' })
+  void app.register(siteRoutes, { prefix: '/api' })
+
+  void app.register(authRenewalPlugin)
+
+  // 初始化服务（数据库建表等）；数据库不可用时由调用方决定重试策略
+  const initAppServices = async (): Promise<void> => {
+    await initServices(app.log)
+    await oauthProviderConfigService.initTable()
+    await oauthProviderConfigService.validateEnabledProviders()
+  }
+
+  return { app, initAppServices }
+}
