@@ -17,7 +17,7 @@ import { httpServerHandler } from 'cloudflare:node'
 import type { FastifyInstance } from 'fastify'
 import { D1BindingClient } from '@nav/database'
 import { buildApp } from './app.js'
-import { databaseClient, dynamicBackupStorage } from './src/services.js'
+import { databaseClient, dynamicBackupStorage, dynamicPublicStorage } from './src/services.js'
 import { D1StorageClient } from './src/lib/d1-storage.js'
 
 type WorkerHandler = ReturnType<typeof httpServerHandler>
@@ -90,14 +90,16 @@ async function ensureServicesReady(state: AppState): Promise<void> {
   try {
     await state.initAppServices()
     // storage_purpose_configs 无配置时 initServices 会回退到 LocalClient——
-    // workerd 文件系统不持久，快照/备份会丢。未配置外部存储时改用 D1 blob 表。
+    // workerd 文件系统不持久，快照/备份/图标都会丢。未配置外部存储时改用 D1 blob 表。
     if (state.d1Storage) {
       const configured = await databaseClient.first(
         'SELECT purpose FROM storage_purpose_configs LIMIT 1'
       )
       if (!configured) {
         dynamicBackupStorage.setClient(state.d1Storage)
-        state.app.log.info('Backup storage switched to D1 blobs (no external storage configured)')
+        // 图标同样持久化到 D1，公开读取走 /api/storage/blob/<key> 端点
+        dynamicPublicStorage.setClient(state.d1Storage)
+        state.app.log.info('Storage switched to D1 blobs (no external storage configured)')
       }
     }
     servicesReady = true
