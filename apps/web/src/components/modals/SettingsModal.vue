@@ -53,13 +53,42 @@
         </div>
       </div>
     </section>
+
+    <!-- 站点管理（仅管理员可见） -->
+    <section v-if="showSiteAdmin" class="prefs-card">
+      <div class="prefs-card__body">
+        <div class="preference-row">
+          <div class="launch__copy">
+            <div class="launch__title">
+              允许新用户注册
+              <span v-if="regSaving" class="reg-status">保存中…</span>
+              <span v-else-if="regError" class="reg-status reg-status--err">{{ regError }}</span>
+            </div>
+            <div class="launch__hint">开启后，访客可在登录页注册新账号；关闭则只有已有账号能登录</div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            class="switch"
+            :class="{ 'is-on': registrationEnabled }"
+            :aria-checked="registrationEnabled"
+            :disabled="regLoading"
+            @click="toggleRegistration"
+          >
+            <span class="switch__thumb" />
+            <span class="sr-only">{{ registrationEnabled ? '已开启' : '已关闭' }}</span>
+          </button>
+        </div>
+      </div>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useAuthStore } from '@/stores/auth'
+import { getSiteSettings, updateSiteSettings } from '@/api/admin'
 
 const store = useSettingsStore()
 const authStore = useAuthStore()
@@ -81,6 +110,48 @@ const toggleAIAnimation = () => {
   store.updateSettings({ aiAnimationEnabled: aiAnimationEnabled.value })
   if (authStore.isAuthenticated) void store.saveRemotePreferences(authStore.user?.id)
 }
+
+// ── 站点管理（仅管理员可见） ──────────────────
+const showSiteAdmin = ref(false)
+const registrationEnabled = ref(false)
+const regLoading = ref(false)
+const regSaving = ref(false)
+const regError = ref('')
+
+onMounted(async () => {
+  if (!authStore.isAuthenticated) return
+  regLoading.value = true
+  try {
+    const res = await getSiteSettings()
+    if (res.success && res.data) {
+      showSiteAdmin.value = true
+      registrationEnabled.value = res.data.registrationEnabled
+    }
+  } catch {
+    /* 非（或尚未刷新为）管理员：隐藏该区块 */
+  } finally {
+    regLoading.value = false
+  }
+})
+
+const toggleRegistration = async () => {
+  if (regSaving.value) return
+  const next = !registrationEnabled.value
+  regSaving.value = true
+  regError.value = ''
+  try {
+    const res = await updateSiteSettings({ registrationEnabled: next })
+    if (res.success && res.data) {
+      registrationEnabled.value = res.data.registrationEnabled
+    } else {
+      regError.value = res.message || '保存失败，请重试'
+    }
+  } catch {
+    regError.value = '保存失败，请检查网络'
+  } finally {
+    regSaving.value = false
+  }
+}
 </script>
 
 <style scoped lang="scss">
@@ -95,6 +166,21 @@ const toggleAIAnimation = () => {
   background: transparent;
   overflow: hidden;
   box-shadow: none;
+}
+
+.prefs-card + .prefs-card {
+  margin-top: 14px;
+}
+
+.reg-status {
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+
+  &--err {
+    color: #ef4444;
+  }
 }
 
 .prefs-card__body {
