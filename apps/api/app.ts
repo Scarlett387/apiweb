@@ -10,6 +10,7 @@ import { AppError } from '@nav/core'
 import { configs } from '@nav/logger'
 import iconRoutes from './src/routes/icon.js'
 import storageRoutes from './src/routes/storage.route.js'
+import publicRoutes from './src/routes/public.route.js'
 import backupRoutes from './src/routes/backup.js'
 import syncRoutes from './src/routes/sync.route.js'
 import authRoutes from './src/routes/auth.route.js'
@@ -192,6 +193,7 @@ export async function buildApp(
   // 统一由后续 app.ready() 完成装配（Node/Vercel/Docker 行为不变）。
   void app.register(iconRoutes, { prefix: '/api' })
   void app.register(storageRoutes, { prefix: '/api' })
+  void app.register(publicRoutes, { prefix: '/api' })
   void app.register(backupRoutes, { prefix: '/api' })
   void app.register(syncRoutes, { prefix: '/api' })
   const oauthProviderConfigService = new OAuthProviderConfigService(
