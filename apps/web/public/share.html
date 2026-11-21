@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>猫猫API · 导航站</title>
+<style>
+:root {
+  --bg: #0f1117; --bg-card: #1a1d27; --bg-card-hover: #21252f;
+  --text: #e6e8ee; --text-dim: #8b8fa3; --accent: #6c8cff; --border: #262a36;
+  --tag-signin: #f97316; --tag-taste: #3b82f6;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  min-height: 100vh;
+}
+.header {
+  position: sticky; top: 0; z-index: 10;
+  background: rgba(15,17,23,.92); backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border); padding: 14px 20px;
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-logo { width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg, #6c8cff, #a06cff); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+.brand h1 { font-size: 18px; font-weight: 700; }
+.brand small { color: var(--text-dim); font-size: 12px; display: block; margin-top: 1px; }
+.search-wrap { flex: 1; min-width: 200px; max-width: 480px; margin-left: auto; position: relative; }
+.search-wrap input {
+  width: 100%; padding: 9px 14px 9px 36px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--bg-card); color: var(--text);
+  font-size: 14px; outline: none;
+}
+.search-wrap input:focus { border-color: var(--accent); }
+.search-wrap::before { content: "🔍"; position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 13px; opacity: .6; }
+.stats { color: var(--text-dim); font-size: 12px; white-space: nowrap; }
+.cats {
+  display: flex; gap: 8px; padding: 12px 20px; overflow-x: auto;
+  position: sticky; top: 63px; z-index: 9;
+  background: rgba(15,17,23,.92); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border);
+  scrollbar-width: none;
+}
+.cats::-webkit-scrollbar { display: none; }
+.cat-chip {
+  flex-shrink: 0; padding: 7px 14px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--bg-card); color: var(--text-dim);
+  font-size: 13px; transition: all .15s; white-space: nowrap;
+}
+.cat-chip:hover { color: var(--text); border-color: var(--accent); }
+.cat-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.main { padding: 20px; max-width: 1280px; margin: 0 auto; }
+.cat-section { margin-bottom: 34px; }
+.cat-title { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; }
+.cat-title h2 { font-size: 17px; font-weight: 700; }
+.cat-title span { color: var(--text-dim); font-size: 12px; }
+.grid {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+}
+.card {
+  display: flex; align-items: center; gap: 12px; padding: 13px 14px;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 13px;
+  text-decoration: none; color: var(--text); transition: all .15s;
+}
+.card:hover { background: var(--bg-card-hover); border-color: var(--accent); transform: translateY(-2px); }
+.card .thumb { position: relative; width: 34px; height: 34px; flex-shrink: 0; }
+.card .fallback { width: 34px; height: 34px; border-radius: 8px; background: linear-gradient(135deg,#3a3f52,#2a2e3c); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; color: #9aa1b9; }
+.card img { position: absolute; inset: 0; width: 34px; height: 34px; border-radius: 8px; object-fit: contain; background: #fff; }
+.card .fallback { width: 34px; height: 34px; border-radius: 8px; background: linear-gradient(135deg,#3a3f52,#2a2e3c); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; color: #9aa1b9; flex-shrink: 0; }
+.card-info { min-width: 0; flex: 1; }
+.card-name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-desc { font-size: 12px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 3px; }
+.card-tags { display: flex; gap: 5px; margin-top: 5px; flex-shrink: 0; }
+.tag { font-size: 10px; padding: 2px 7px; border-radius: 999px; font-weight: 600; }
+.tag.signin { color: var(--tag-signin); border: 1px solid var(--tag-signin); }
+.tag.taste { color: var(--tag-taste); border: 1px solid var(--tag-taste); }
+.empty { text-align: center; color: var(--text-dim); padding: 60px 20px; }
+.status { text-align: center; padding: 80px 20px; color: var(--text-dim); }
+.status .spin { font-size: 28px; display: inline-block; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.footer { text-align: center; color: var(--text-dim); font-size: 12px; padding: 30px 20px 40px; }
+@media (max-width: 560px) {
+  .grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+  .search-wrap { order: 3; max-width: 100%; flex-basis: 100%; margin-left: 0; }
+  .cats { top: 104px; }
+}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="brand">
+    <div class="brand-logo">🧭</div>
+    <div><h1>猫猫API</h1><small id="subTitle">导航站 · 公开只读</small></div>
+  </div>
+  <div class="search-wrap"><input id="search" type="search" placeholder="搜索站点名称 / 描述 / 域名…"></div>
+  <div class="stats" id="stats"></div>
+</div>
+<div class="cats" id="cats"></div>
+<div class="main" id="main"><div class="status"><span class="spin">🌀</span><p>正在加载导航数据…</p></div></div>
+<div class="footer">数据实时同步自站主 · <span id="updatedAt"></span></div>
+
+<script>
+const TAG_CLS = { '签到': 'signin', '试吃': 'taste' };
+let DATA = null, activeCat = '';
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const hostOf = u => { try { return new URL(u).hostname; } catch { return ''; } };
+
+function cardHtml(w) {
+  const tagIds = w.tagIds || [];
+  const tags = (DATA.tags || []).filter(t => tagIds.includes(t.id))
+    .map(t => `<span class="tag ${TAG_CLS[t.name] || ''}">${esc(t.name)}</span>`).join('');
+  const first = ((w.name || '?').trim().charAt(0)) || '?';
+  const icon = `<div class="thumb"><div class="fallback">${esc(first)}</div>${
+    w.favicon ? `<img loading="lazy" src="${esc(w.favicon)}" onerror="this.remove()">` : ''
+  }</div>`;
+  const desc = w.description || hostOf(w.url);
+  return `<a class="card" href="${esc(w.url)}" target="_blank" rel="noopener">
+    ${icon}
+    <div class="card-info">
+      <div class="card-name">${esc(w.name)}</div>
+      <div class="card-desc">${esc(desc)}</div>
+    </div>
+    ${tags ? `<div class="card-tags">${tags}</div>` : ''}
+  </a>`;
+}
+
+function render() {
+  const q = $('search').value.trim().toLowerCase();
+  const cats = DATA.categories.slice().sort((a,b) => a.order - b.order);
+  const byCat = {};
+  for (const w of DATA.websites) {
+    if (q && !( (w.name||'') + ' ' + (w.description||'') + ' ' + hostOf(w.url) ).toLowerCase().includes(q)) continue;
+    (byCat[w.categoryId] = byCat[w.categoryId] || []).push(w);
+  }
+  const catsBox = $('cats');
+  if (q) { catsBox.innerHTML = ''; } else if (catsBox.dataset.built !== '1') {
+    catsBox.innerHTML = `<div class="cat-chip active" data-cat="">全部 ${DATA.websites.length}</div>` +
+      cats.map(c => `<div class="cat-chip" data-cat="${esc(c.id)}">${esc(c.name)} ${((byCat[c.id]||[]).length || DATA.websites.filter(w=>w.categoryId===c.id).length)}</div>`).join('');
+    catsBox.dataset.built = '1';
+  }
+  const shownCats = q ? cats : (activeCat ? cats.filter(c => c.id === activeCat) : cats);
+  let html = '';
+  for (const c of shownCats) {
+    const items = (byCat[c.id] || []).slice().sort((a,b) => a.order - b.order);
+    if (!items.length) continue;
+    html += `<div class="cat-section"><div class="cat-title"><h2>${esc(c.name)}</h2><span>${items.length} 个站点</span></div>
+      <div class="grid">${items.map(cardHtml).join('')}</div></div>`;
+  }
+  $('main').innerHTML = html || `<div class="empty">没有匹配「${esc(q)}」的站点</div>`;
+}
+
+fetch('/api/public/nav').then(r => r.json()).then(d => {
+  if (!d.success) throw new Error(d.message || '加载失败');
+  DATA = d.data;
+  $('stats').textContent = `${DATA.websites.length} 个站点 · ${DATA.categories.length} 个分类`;
+  $('updatedAt').textContent = DATA.updatedAt ? '更新于 ' + new Date(DATA.updatedAt).toLocaleString('zh-CN') : '';
+  render();
+}).catch(e => {
+  $('main').innerHTML = `<div class="empty">😵 ${esc(e.message)}<br><br><button onclick="location.reload()" style="padding:8px 18px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);cursor:pointer">重试</button></div>`;
+});
+
+$('cats').addEventListener('click', e => {
+  const chip = e.target.closest('.cat-chip');
+  if (!chip) return;
+  activeCat = chip.dataset.cat;
+  document.querySelectorAll('.cat-chip').forEach(c => c.classList.toggle('active', c === chip));
+  render();
+});
+$('search').addEventListener('input', () => render());
+</script>
+</body>
+</html>
