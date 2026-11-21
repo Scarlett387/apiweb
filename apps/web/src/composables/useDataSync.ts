@@ -39,9 +39,17 @@ export function useDataSync() {
   let refreshTimer: number | null = null
   let localSyncInFlight = false
 
-  // 访客模式：拉取站主公开分享的导航数据（只读），灌入本地 store。
-  // 失败静默——访客看到空数据即可，不打扰。
+  // 访客/本地模式：拉取站主公开分享的导航数据，与本地已有数据合并展示。
+  // 合并规则：按 id 去重，同 id 以云端为准（保证站主更新可见），
+  // 本地新增（id 不在云端）的条目全部保留——本地数据仅存浏览器，不上云。
+  // 失败静默——不打扰浏览。
   let visitorHydrated = false
+  const mergeById = <T extends { id: string }>(remote: T[], local: readonly T[]): T[] => {
+    const map = new Map<string, T>()
+    for (const item of local) map.set(item.id, item)
+    for (const item of remote) map.set(item.id, item) // 云端同 id 覆盖本地
+    return [...map.values()]
+  }
   const hydrateVisitorData = async () => {
     if (visitorHydrated) return
     visitorHydrated = true
@@ -49,9 +57,30 @@ export function useDataSync() {
       const res = await request.get<{ data: PublicNavPayload }>('/api/public/nav')
       if (res?.success && res.data) {
         const { websites, categories, tags } = res.data
-        if (Array.isArray(websites)) websiteStore.overwriteWebsites(websites as never[])
-        if (Array.isArray(categories)) categoryStore.overwriteCategories(categories as never[])
-        if (Array.isArray(tags)) tagStore.overwriteTags(tags as never[])
+        if (Array.isArray(websites)) {
+          websiteStore.overwriteWebsites(
+            mergeById(
+              websites as { id: string }[],
+              websiteStore.websites as unknown as { id: string }[]
+            ) as never[]
+          )
+        }
+        if (Array.isArray(categories)) {
+          categoryStore.overwriteCategories(
+            mergeById(
+              categories as { id: string }[],
+              categoryStore.categories as unknown as { id: string }[]
+            ) as never[]
+          )
+        }
+        if (Array.isArray(tags)) {
+          tagStore.overwriteTags(
+            mergeById(
+              tags as { id: string }[],
+              tagStore.tags as unknown as { id: string }[]
+            ) as never[]
+          )
+        }
       }
     } catch (err) {
       logger.warn(

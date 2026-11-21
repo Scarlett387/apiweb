@@ -74,7 +74,7 @@
             <template #default="{ website }">
               <div
                 class="website-draggable"
-                :draggable="!uiStore.isVisitor"
+                draggable="true"
                 @dragstart="onDragStart(website.id, $event)"
                 @dragover="onDragOver(website.id, $event)"
                 @drop="onDrop(website.id, $event)"
@@ -91,10 +91,7 @@
             </template>
 
             <template
-              v-if="
-                !uiStore.isVisitor &&
-                (filteredWebsites.length > 0 || websiteStore.websites.length === 0)
-              "
+              v-if="filteredWebsites.length > 0 || websiteStore.websites.length === 0"
               #add-card
             >
               <div class="add-card" @click="onAddSite">
@@ -143,7 +140,6 @@ import WebsiteCard from '@/components/WebsiteCard.vue'
 import InfiniteWebsiteGrid from '@/components/InfiniteWebsiteGrid.vue'
 import { EmptyState, BaseButton } from '@nav/ui'
 import { useWebsiteStore } from '@/stores/website'
-import { useUIStore } from '@/stores/ui'
 import { useCategoryStore } from '@/stores/category'
 import { useWebsiteSearch } from '@/composables/useWebsiteSearch'
 import { useWebsiteDrag } from '@/composables/useWebsiteDrag'
@@ -166,7 +162,6 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits(['edit', 'delete', 'addSite', 'manageTags', 'manageCategories'])
 
 const websiteStore = useWebsiteStore()
-const uiStore = useUIStore()
 const categoryStore = useCategoryStore()
 
 // 使用组合式函数
@@ -206,9 +201,8 @@ const onVisit = (website: Website) => {
   window.open(website.url, '_blank', 'noopener,noreferrer')
 }
 
-// 侧栏分类拖动排序：按新顺序回写 store（登录后自动云同步）
+// 侧栏分类拖动排序：按新顺序回写 store（登录后自动云同步；本地模式存浏览器）
 const onReorderCategories = (newOrderIds: string[]) => {
-  if (uiStore.isVisitor) return
   categoryStore.reorderCategories(newOrderIds)
 }
 

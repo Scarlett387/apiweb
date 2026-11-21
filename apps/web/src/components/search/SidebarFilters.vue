@@ -5,7 +5,6 @@
       <div class="filter-header">
         <label class="filter-label">标签</label>
         <BaseButton
-          v-if="!isVisitor"
           variant="neutral-ghost"
           size="xs"
           icon="fas fa-pencil-alt"
@@ -18,7 +17,6 @@
       <div v-if="tags.length === 0" class="sidebar-empty-state">
         <p class="empty-desc-text">添加网站后，可用标签快速筛选。</p>
         <BaseButton
-          v-if="!isVisitor"
           class="create-first-btn"
           variant="neutral-ghost"
           size="xs"
@@ -46,7 +44,6 @@
       <div class="filter-header">
         <label class="filter-label">分类</label>
         <BaseButton
-          v-if="!isVisitor"
           variant="ghost"
           size="xs"
           icon="fas fa-pencil-alt"
@@ -64,7 +61,6 @@
           </button>
         </div>
         <BaseButton
-          v-if="!isVisitor"
           class="create-first-btn"
           variant="ghost"
           size="xs"
@@ -92,14 +88,14 @@
             dragging: dragCategoryId === category.id,
             'drop-target': dropTargetCategoryId === category.id
           }"
-          :draggable="!isVisitor"
+          draggable="true"
           @click="$emit('selectCategory', category.id)"
           @dragstart="onCategoryDragStart(category.id, $event)"
           @dragover.prevent="onCategoryDragOver(category.id)"
           @drop.prevent="onCategoryDrop(category.id)"
           @dragend="onCategoryDragEnd"
         >
-          <span v-if="!isVisitor" class="category-grip" aria-hidden="true">
+          <span class="category-grip" aria-hidden="true">
             <i class="fas fa-grip-vertical" />
           </span>
           <span class="category-name">{{ category.name }}</span>
@@ -113,7 +109,6 @@
 import { ref, computed } from 'vue'
 import { BaseButton } from '@nav/ui'
 import ChoiceChip from '@/components/ChoiceChip.vue'
-import { useUIStore } from '@/stores/ui'
 import type { Tag, Category } from '@/types'
 
 const props = defineProps<{
@@ -131,18 +126,11 @@ const emit = defineEmits<{
   (e: 'reorderCategories', newOrderIds: string[]): void
 }>()
 
-const uiStore = useUIStore()
-const isVisitor = computed(() => uiStore.isVisitor)
-
 // —— 分类拖动排序 ——
 const dragCategoryId = ref<string | null>(null)
 const dropTargetCategoryId = ref<string | null>(null)
 
 const onCategoryDragStart = (id: string, evt: DragEvent) => {
-  if (isVisitor.value) {
-    evt.preventDefault()
-    return
-  }
   dragCategoryId.value = id
   evt.dataTransfer?.setData('text/plain', id)
   if (evt.dataTransfer) evt.dataTransfer.effectAllowed = 'move'
