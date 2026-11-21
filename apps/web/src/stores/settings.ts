@@ -10,7 +10,9 @@ export const DEFAULT_SETTINGS: UserSettings = {
   theme: 'auto',
   autoBackup: true,
   aiAnimationEnabled: true,
-  defaultHome: 'home'
+  defaultHome: 'home',
+  wallpaperMode: 'none',
+  wallpaperUrl: ''
 }
 
 const USER_PREFERENCES_CACHE_PREFIX = 'userPreferences:'
@@ -65,7 +67,16 @@ function normalizeSettings(raw: Partial<UserSettings> | null | undefined): UserS
       typeof raw?.aiAnimationEnabled === 'boolean'
         ? raw.aiAnimationEnabled
         : DEFAULT_SETTINGS.aiAnimationEnabled,
-    defaultHome: validHome
+    defaultHome: validHome,
+    wallpaperMode:
+      raw?.wallpaperMode === 'bing' || raw?.wallpaperMode === 'url' || raw?.wallpaperMode === 'none'
+        ? raw.wallpaperMode
+        : DEFAULT_SETTINGS.wallpaperMode,
+    wallpaperUrl:
+      typeof raw?.wallpaperUrl === 'string' &&
+      /^https?:\/\/.+/i.test(raw.wallpaperUrl.trim())
+        ? raw.wallpaperUrl.trim()
+        : DEFAULT_SETTINGS.wallpaperUrl
   }
 }
 
@@ -295,6 +306,11 @@ export const useSettingsStore = defineStore('settings', () => {
         mqlHandler = null
       }
     }
+    // 壁纸开启时给根节点加标记，全局玻璃样式依赖该类名。
+    const mode = settings.value.wallpaperMode || 'none'
+    const wallpaperActive =
+      mode === 'bing' || (mode === 'url' && !!settings.value.wallpaperUrl)
+    root.classList.toggle('has-wallpaper', wallpaperActive)
   }
 
   const saveToLocalStorage = () => {

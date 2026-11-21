@@ -81,11 +81,74 @@
         </div>
       </div>
     </section>
+    <!-- 背景壁纸（毛玻璃模式） -->
+    <section class="prefs-card">
+      <div class="prefs-card__body">
+        <div class="preference-row wallpaper-row">
+          <div class="launch__copy">
+            <div class="launch__title">背景壁纸</div>
+            <div class="launch__hint">开启毛玻璃风格；仅保存在当前设备，不影响其他浏览器</div>
+          </div>
+          <div class="seg" role="radiogroup" aria-label="背景壁纸">
+            <button
+              type="button"
+              role="radio"
+              class="seg__btn"
+              :class="{ 'is-on': wallpaperMode === 'none' }"
+              :aria-checked="wallpaperMode === 'none'"
+              @click="setWallpaperMode('none')"
+            >
+              关闭
+            </button>
+            <button
+              type="button"
+              role="radio"
+              class="seg__btn"
+              :class="{ 'is-on': wallpaperMode === 'bing' }"
+              :aria-checked="wallpaperMode === 'bing'"
+              @click="setWallpaperMode('bing')"
+            >
+              必应每日
+            </button>
+            <button
+              type="button"
+              role="radio"
+              class="seg__btn"
+              :class="{ 'is-on': wallpaperMode === 'url' }"
+              :aria-checked="wallpaperMode === 'url'"
+              @click="setWallpaperMode('url')"
+            >
+              自定义
+            </button>
+          </div>
+        </div>
+
+        <div v-if="wallpaperMode === 'url'" class="rule" role="separator" />
+        <div v-if="wallpaperMode === 'url'" class="wallpaper-url-row">
+          <input
+            v-model="wallpaperUrlInput"
+            type="url"
+            class="wallpaper-url-input"
+            placeholder="粘贴图片直链，例如 https://example.com/bg.jpg"
+            @keydown.enter="applyWallpaperUrl"
+          />
+          <button
+            type="button"
+            class="wallpaper-url-btn"
+            :disabled="!wallpaperUrlInput.trim()"
+            @click="applyWallpaperUrl"
+          >
+            应用
+          </button>
+        </div>
+        <p v-if="wallpaperError" class="wallpaper-error">{{ wallpaperError }}</p>
+      </div>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useAuthStore } from '@/stores/auth'
 import { getSiteSettings, updateSiteSettings } from '@/api/admin'
@@ -109,6 +172,37 @@ const toggleAIAnimation = () => {
   aiAnimationEnabled.value = !aiAnimationEnabled.value
   store.updateSettings({ aiAnimationEnabled: aiAnimationEnabled.value })
   if (authStore.isAuthenticated) void store.saveRemotePreferences(authStore.user?.id)
+}
+
+// ── 背景壁纸 ─────────────────────────────────
+const wallpaperMode = computed(() => store.settings.wallpaperMode || 'none')
+const wallpaperUrlInput = ref('')
+const wallpaperError = ref('')
+
+const setWallpaperMode = (mode: 'none' | 'bing' | 'url') => {
+  wallpaperError.value = ''
+  if (mode === 'url') {
+    wallpaperUrlInput.value = store.settings.wallpaperUrl || ''
+    // 若已有保存过的地址，直接沿用；否则等用户点「应用」。
+    if (store.settings.wallpaperUrl) {
+      store.updateSettings({ wallpaperMode: 'url' })
+    } else {
+      store.updateSettings({ wallpaperMode: 'none', wallpaperUrl: '' })
+    }
+    return
+  }
+  store.updateSettings({ wallpaperMode: mode })
+}
+
+const applyWallpaperUrl = () => {
+  const url = wallpaperUrlInput.value.trim()
+  if (!url) return
+  if (!/^https?:\/\/.+/i.test(url)) {
+    wallpaperError.value = '请输入以 http(s):// 开头的图片地址'
+    return
+  }
+  wallpaperError.value = ''
+  store.updateSettings({ wallpaperMode: 'url', wallpaperUrl: url })
 }
 
 // ── 站点管理（仅管理员可见） ──────────────────
@@ -181,6 +275,59 @@ const toggleRegistration = async () => {
   &--err {
     color: #ef4444;
   }
+}
+
+.wallpaper-row {
+  flex-wrap: wrap;
+}
+
+.wallpaper-url-row {
+  display: flex;
+  gap: 10px;
+}
+
+.wallpaper-url-input {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 9px;
+  background: var(--bg-tile);
+  color: var(--text-main);
+  font-size: 13px;
+  font-family: inherit;
+
+  &:focus {
+    outline: none;
+    border-color: var(--color-primary);
+  }
+}
+
+.wallpaper-url-btn {
+  flex-shrink: 0;
+  height: 36px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 9px;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity 0.15s ease;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.wallpaper-error {
+  margin-top: 8px;
+  color: #ef4444;
+  font-size: 12px;
 }
 
 .prefs-card__body {

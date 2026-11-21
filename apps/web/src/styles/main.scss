@@ -408,3 +408,99 @@ body,
     transform: scale(0.98);
   }
 }
+
+// ═══════════════════════════════════════════════════
+//  壁纸 + 毛玻璃模式（html.has-wallpaper 时启用）
+//  仅磨砂化面板容器：顶栏 / 搜索框 / 侧栏 / 弹窗。
+//  站点卡片样式刻意保持原样。
+// ═══════════════════════════════════════════════════
+html.has-wallpaper {
+  body,
+  #app {
+    background: transparent;
+  }
+
+  .app-container {
+    background: transparent !important;
+  }
+
+  .wallpaper-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    pointer-events: none;
+  }
+
+  // 轻纱遮罩：保证面板外直接暴露在壁纸上区域的文字可读性
+  .wallpaper-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background: rgba(246, 247, 250, 0.42);
+    pointer-events: none;
+  }
+
+  [data-theme='dark'] .wallpaper-scrim {
+    background: rgba(2, 6, 23, 0.5);
+  }
+
+  .main-content {
+    position: relative;
+    z-index: 1;
+  }
+
+  // —— 顶栏 ——
+  .rail {
+    background: rgba(255, 255, 255, 0.55) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    backdrop-filter: blur(20px) saturate(160%);
+    border-bottom-color: rgba(255, 255, 255, 0.4) !important;
+  }
+
+  [data-theme='dark'] .rail {
+    background: rgba(9, 14, 26, 0.55) !important;
+    border-bottom-color: rgba(255, 255, 255, 0.08) !important;
+  }
+
+  // —— 中央搜索框 ——
+  .search-header-wrapper {
+    background: rgba(255, 255, 255, 0.55);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    backdrop-filter: blur(20px) saturate(160%);
+    border-color: rgba(255, 255, 255, 0.45);
+    box-shadow: 0 8px 28px rgba(15, 23, 42, 0.1);
+  }
+
+  [data-theme='dark'] .search-header-wrapper {
+    background: rgba(9, 14, 26, 0.5);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  }
+
+  // —— 左侧筛选栏 ——
+  .sidebar-filters {
+    background: rgba(255, 255, 255, 0.5);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    backdrop-filter: blur(20px) saturate(160%);
+    border-color: rgba(255, 255, 255, 0.4);
+  }
+
+  [data-theme='dark'] .sidebar-filters {
+    background: rgba(9, 14, 26, 0.5);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  // —— 弹窗 ——
+  .modal-container {
+    -webkit-backdrop-filter: blur(26px) saturate(150%);
+    backdrop-filter: blur(26px) saturate(150%);
+    background: rgba(255, 255, 255, 0.78) !important;
+  }
+
+  [data-theme='dark'] .modal-container {
+    background: rgba(9, 14, 26, 0.8) !important;
+  }
+}

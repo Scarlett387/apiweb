@@ -1,5 +1,12 @@
 <template>
   <div class="app-container">
+    <!-- 壁纸背景层（毛玻璃模式） -->
+    <div
+      v-if="wallpaperDisplayUrl"
+      class="wallpaper-layer"
+      :style="{ backgroundImage: `url('${wallpaperDisplayUrl}')` }"
+    />
+    <div v-if="wallpaperDisplayUrl" class="wallpaper-scrim" />
     <HeaderBar @add-site="handleAddSite" @open-account-panel="openAccountPanel" />
     <main class="main-content">
       <div class="container">
@@ -87,6 +94,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useUIStore } from '@/stores/ui'
+import { useSettingsStore } from '@/stores/settings'
 import { BaseButton, BaseModal } from '@nav/ui'
 import HeaderBar from '@/components/header/HeaderBar.vue'
 import AddSiteModal from '@/components/modals/AddSiteModal.vue'
@@ -97,8 +105,54 @@ import ToastContainer from '@/components/toast/ToastContainer.vue'
 import type { AccountPanelTab } from '@/types'
 
 const uiStore = useUIStore()
+const settingsStore = useSettingsStore()
 const addSiteDirty = ref(false)
 const discardAddSiteConfirmOpen = ref(false)
+
+// ── 壁纸（毛玻璃模式） ──────────────────────────
+const wallpaperDisplayUrl = ref('')
+
+const loadBingWallpaper = async () => {
+  // 每天一张图：按日期缓存到 sessionStorage，避免每次进入页面都请求。
+  const dayKey = `bingWallpaper:${new Date().toISOString().slice(0, 10)}`
+  try {
+    const cached = sessionStorage.getItem(dayKey)
+    if (cached) {
+      wallpaperDisplayUrl.value = cached
+      return
+    }
+    const res = await fetch('/api/public/bing')
+    const json = (await res.json()) as { success?: boolean; data?: { url?: string } }
+    if (json.success && json.data?.url) {
+      wallpaperDisplayUrl.value = json.data.url
+      try {
+        sessionStorage.setItem(dayKey, json.data.url)
+      } catch {
+        /* 缓存失败不影响展示 */
+      }
+    }
+  } catch {
+    /* 获取失败时保持无壁纸 */
+  }
+}
+
+const syncWallpaper = () => {
+  const mode = settingsStore.settings.wallpaperMode || 'none'
+  if (mode === 'url') {
+    wallpaperDisplayUrl.value = settingsStore.settings.wallpaperUrl || ''
+  } else if (mode === 'bing') {
+    void loadBingWallpaper()
+  } else {
+    wallpaperDisplayUrl.value = ''
+  }
+}
+
+syncWallpaper()
+
+watch(
+  () => [settingsStore.settings.wallpaperMode, settingsStore.settings.wallpaperUrl],
+  () => syncWallpaper()
+)
 
 const addSiteTitle = computed(() => {
   return uiStore.getModalData('addSite')?.website ? '编辑网站' : '添加网站'

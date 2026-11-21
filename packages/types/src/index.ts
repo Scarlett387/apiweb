@@ -43,6 +43,10 @@ export interface UserSettings {
   /** 是否播放 AI 助手贴边小鸟动效 */
   aiAnimationEnabled?: boolean
   defaultHome?: 'home' | 'all'
+  /** 背景壁纸模式：关闭 / 必应每日一图 / 自定义图片 URL（仅存本设备） */
+  wallpaperMode?: 'none' | 'bing' | 'url'
+  /** 自定义壁纸图片地址（wallpaperMode === 'url' 时生效） */
+  wallpaperUrl?: string
 }
 
 export interface UserPreferences {

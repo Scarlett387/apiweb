@@ -19,6 +19,43 @@ interface BlobRow {
 }
 
 const publicRoutes: FastifyPluginAsyncZod = async app => {
+  // ── 必应每日一图代理 ──────────────────────────────
+  // 服务端转发 www.bing.com HPImageArchive，避免浏览器直连的 CORS/网络问题。
+  // 结果内存缓存 1 小时（必应每天只换一张图）。
+  let bingCache: { url: string; fetchedAt: number } | null = null
+
+  app.get('/public/bing', async (_req, reply) => {
+    if (bingCache && Date.now() - bingCache.fetchedAt < 3600_000) {
+      return reply.header('cache-control', 'public, max-age=600').send({
+        success: true,
+        data: { url: bingCache.url }
+      })
+    }
+    try {
+      const res = await fetch(
+        'https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1',
+        { headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' } }
+      )
+      if (!res.ok) throw new Error(`bing responded ${res.status}`)
+      const json = (await res.json()) as { images?: { url?: string }[] }
+      const raw = json.images?.[0]?.url
+      if (!raw) throw new Error('empty images')
+      const url = raw.startsWith('http') ? raw : `https://www.bing.com${raw}`
+      bingCache = { url, fetchedAt: Date.now() }
+      return reply.header('cache-control', 'public, max-age=600').send({
+        success: true,
+        data: { url }
+      })
+    } catch (err) {
+      _req.log.warn({ err }, 'Bing wallpaper fetch failed')
+      return reply.code(502).send({
+        success: false,
+        code: 'BING_FETCH_FAILED',
+        message: '获取必应每日图片失败'
+      })
+    }
+  })
+
   app.get(
     '/public/nav',
     {
