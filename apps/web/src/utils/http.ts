@@ -8,7 +8,9 @@ export interface ApiResponse<T = unknown> {
   code?: string
 }
 
-const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8787'
+// 同源相对地址：Worker 同时托管前端与 /api，无需按环境配置。
+// 仅当 API 部署在别的域名时才需要设置 VITE_API_BASE_URL。
+const baseURL = import.meta.env.VITE_API_BASE_URL || ''
 // Use 30s timeout to accommodate slow external OAuth API calls
 const TIMEOUT = 30000
 
