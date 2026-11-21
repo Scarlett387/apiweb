@@ -23,6 +23,8 @@ export interface Category {
   icon?: string
   order: number
   websiteCount: number
+  /** 是否对外公开（访客可见）。缺省视为公开；false 时该分类及其下网站不出现在公开数据中 */
+  isPublic?: boolean
   createdAt: Date
   updatedAt: Date
 }

@@ -115,6 +115,7 @@ export const useCategoryStore = defineStore('category', () => {
         icon: c.icon,
         order: typeof c.order === 'number' ? c.order : 0,
         websiteCount: typeof c.websiteCount === 'number' ? c.websiteCount : 0,
+        isPublic: c.isPublic !== false,
         createdAt: c.createdAt ? new Date(c.createdAt) : now,
         updatedAt: c.updatedAt ? new Date(c.updatedAt) : now
       }))

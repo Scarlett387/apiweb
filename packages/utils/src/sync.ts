@@ -67,6 +67,7 @@ export type NormalizedSyncCategory = {
   description: string
   icon: string
   order: number
+  isPublic: boolean
 }
 
 export type NormalizedSyncTag = {
@@ -111,7 +112,8 @@ const normalizeCategory = (category: Partial<Category>): NormalizedSyncCategory 
   name: str(category.name),
   description: str(category.description),
   icon: str(category.icon),
-  order: num(category.order, 0)
+  order: num(category.order, 0),
+  isPublic: category.isPublic !== false
 })
 
 const normalizeTag = (tag: Partial<Tag>): NormalizedSyncTag => ({

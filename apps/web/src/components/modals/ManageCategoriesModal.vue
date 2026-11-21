@@ -74,9 +74,28 @@
               </div>
               <div class="category-item__info">
                 <span class="category-item__name">{{ category.name }}</span>
+                <span
+                  v-if="category.isPublic === false"
+                  class="category-item__private-badge"
+                  title="该分类及其中网站对访客隐藏"
+                >
+                  私密
+                </span>
                 <span class="category-item__count">{{ getCategoryCount(category.id) }}</span>
               </div>
               <div class="category-item__actions">
+                <BaseButton
+                  variant="ghost"
+                  size="sm"
+                  :icon="category.isPublic === false ? 'fas fa-eye-slash' : 'fas fa-eye'"
+                  :title="
+                    category.isPublic === false
+                      ? '当前：私密（仅自己可见）——点击设为公开'
+                      : '当前：公开（访客可见）——点击设为私密'
+                  "
+                  :aria-label="`切换分类 ${category.name} 的公开状态`"
+                  @click="togglePublic(category)"
+                />
                 <BaseButton
                   variant="ghost"
                   size="sm"
@@ -196,6 +215,11 @@ const getCategoryCount = (id: string) => {
 const categoryAffectedCount = computed(() =>
   categoryToDelete.value ? getCategoryCount(categoryToDelete.value.id) : 0
 )
+
+// 切换分类对外公开状态：登录后自动云同步，公开接口会对私密分类及其网站整体隐藏
+const togglePublic = (category: Category) => {
+  categoryStore.updateCategory(category.id, { isPublic: category.isPublic === false })
+}
 
 const handleAddCategory = () => {
   if (!newCategoryName.value.trim()) return
@@ -389,6 +413,15 @@ const onDrop = (e: DragEvent, targetCategory: Category) => {
   font-weight: 600;
   color: var(--text-main);
   font-size: 15px;
+}
+
+.category-item__private-badge {
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-weight: 600;
+  color: #b45309;
+  background-color: rgba(245, 158, 11, 0.14);
 }
 
 .category-item__count {

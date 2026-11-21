@@ -109,12 +109,26 @@ const publicRoutes: FastifyPluginAsyncZod = async app => {
         const asArray = (v: unknown): Record<string, unknown>[] =>
           Array.isArray(v) ? (v as Record<string, unknown>[]) : []
 
+        // 分类级公开开关：isPublic === false 的分类及其下网站不对外
+        const rawCategories = asArray(data.categories)
+        const hiddenCategoryIds = new Set(
+          rawCategories.filter(c => c.isPublic === false).map(c => String(c.id))
+        )
+        const categories =
+          hiddenCategoryIds.size > 0
+            ? rawCategories.filter(c => !hiddenCategoryIds.has(String(c.id)))
+            : rawCategories
+        const websites =
+          hiddenCategoryIds.size > 0
+            ? asArray(data.websites).filter(w => !hiddenCategoryIds.has(String(w.categoryId)))
+            : asArray(data.websites)
+
         return reply.header('cache-control', 'public, max-age=60').send({
           success: true,
           data: {
             updatedAt: snapshot.meta?.createdAt,
-            websites: asArray(data.websites),
-            categories: asArray(data.categories),
+            websites,
+            categories,
             tags: asArray(data.tags)
           }
         })
