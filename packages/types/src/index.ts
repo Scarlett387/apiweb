@@ -49,6 +49,8 @@ export interface UserSettings {
   wallpaperMode?: 'none' | 'bing' | 'url'
   /** 自定义壁纸图片地址（wallpaperMode === 'url' 时生效） */
   wallpaperUrl?: string
+  /** 自动备份的最小间隔：'off' 关闭自动备份；'daily' 每天；'weekly' 每 7 天；'monthly' 每 30 天 */
+  backupFrequency?: 'off' | 'daily' | 'weekly' | 'monthly'
 }
 
 export interface UserPreferences {

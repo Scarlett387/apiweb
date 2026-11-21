@@ -84,6 +84,17 @@ export const useWebsiteStore = defineStore('website', () => {
         const comp = a.name.localeCompare(b.name)
         return sortOrder.value === 'asc' ? comp : -comp
       }
+      if (sortField.value === 'order') {
+        // 自定义排序时先按所属分类的顺序分组（分类拖动换序后"全部"视图跟着变），
+        // 同一分类内再按网站自身 order；未分类的排最后。
+        const catOrderById = new Map(
+          categoryStore.categories.map(c => [c.id, c.order ?? 0] as const)
+        )
+        const UNSET = Number.MAX_SAFE_INTEGER
+        const catA = a.categoryId ? (catOrderById.get(a.categoryId) ?? UNSET) : UNSET
+        const catB = b.categoryId ? (catOrderById.get(b.categoryId) ?? UNSET) : UNSET
+        if (catA !== catB) return catA - catB
+      }
       const aValue = getSortValue(a, sortField.value)
       const bValue = getSortValue(b, sortField.value)
       return sortOrder.value === 'asc' ? aValue - bValue : bValue - aValue

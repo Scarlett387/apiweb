@@ -2,7 +2,7 @@ import { computed, nextTick, readonly, ref } from 'vue'
 import { logger } from '@nav/logger'
 import { canonicalizeSyncDataForHash, mergeSyncData } from '@nav/utils'
 import type { SyncPayload } from '@/types'
-import { createBackup } from '@/api/backup'
+import { createBackup, getBackups } from '@/api/backup'
 import {
   disableSync,
   enableSync,
@@ -828,6 +828,9 @@ export function useCloudSync() {
     const local = websiteStore.exportData()
     if (!hasSyncData(exportSyncPayload())) return true
 
+    // 自动备份频率控制：间隔未到或关闭时跳过（操作照常进行，不影响手动备份）
+    if (!(await shouldAutoBackup())) return true
+
     const res = await createBackup(local, 'AUTO')
     if (!isActiveSession(expectedUserId, generation)) return false
     if (res.success) {
@@ -835,6 +838,34 @@ export function useCloudSync() {
     }
     uiStore.showToast('操作前自动备份失败，已取消同步', 'error')
     return false
+  }
+
+  const BACKUP_INTERVALS_MS: Record<string, number> = {
+    daily: 24 * 3600_000,
+    weekly: 7 * 24 * 3600_000,
+    monthly: 30 * 24 * 3600_000
+  }
+
+  /** 判断当前是否允许再创建一次自动备份（按用户设置的频率节流） */
+  const shouldAutoBackup = async (): Promise<boolean> => {
+    const freq = settingsStore.settings.backupFrequency ?? 'weekly'
+    if (freq === 'off') return false
+    try {
+      const res = await getBackups()
+      if (res.success && Array.isArray(res.data)) {
+        const lastAuto = res.data
+          .filter(b => b.type === 'AUTO')
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+        if (lastAuto) {
+          const age = Date.now() - new Date(lastAuto.created_at).getTime()
+          if (age < (BACKUP_INTERVALS_MS[freq] ?? BACKUP_INTERVALS_MS.weekly)) return false
+        }
+      }
+    } catch {
+      // 备份列表读取失败时保守处理：允许备份（宁多勿丢）
+      return true
+    }
+    return true
   }
 
   /** Let Vue paint loading UI before CPU/network heavy work blocks the main thread. */

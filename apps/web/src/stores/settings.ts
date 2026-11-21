@@ -13,7 +13,9 @@ export const DEFAULT_SETTINGS: UserSettings = {
   defaultHome: 'home',
   // 默认开启必应每日壁纸：访客打开即见毛玻璃美化，无需任何权限
   wallpaperMode: 'bing',
-  wallpaperUrl: ''
+  wallpaperUrl: '',
+  // 自动备份默认每 7 天最多一次，避免频繁生成历史备份
+  backupFrequency: 'weekly'
 }
 
 const USER_PREFERENCES_CACHE_PREFIX = 'userPreferences:'
@@ -76,7 +78,14 @@ function normalizeSettings(raw: Partial<UserSettings> | null | undefined): UserS
     wallpaperUrl:
       typeof raw?.wallpaperUrl === 'string' && /^https?:\/\/.+/i.test(raw.wallpaperUrl.trim())
         ? raw.wallpaperUrl.trim()
-        : DEFAULT_SETTINGS.wallpaperUrl
+        : DEFAULT_SETTINGS.wallpaperUrl,
+    backupFrequency:
+      raw?.backupFrequency === 'off' ||
+      raw?.backupFrequency === 'daily' ||
+      raw?.backupFrequency === 'weekly' ||
+      raw?.backupFrequency === 'monthly'
+        ? raw.backupFrequency
+        : DEFAULT_SETTINGS.backupFrequency
   }
 }
 

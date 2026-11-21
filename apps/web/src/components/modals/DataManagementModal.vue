@@ -68,6 +68,29 @@
             立即备份
           </BaseButton>
         </div>
+
+        <div class="backup-control-card backup-control-card--solo">
+          <div class="backup-control-card__copy">
+            <span class="setting-title">自动备份频率</span>
+            <span class="setting-desc">
+              两次自动备份之间的最小间隔；间隔内只同步数据不生成历史备份。手动备份不受影响。
+            </span>
+            <div class="freq-seg" role="radiogroup" aria-label="自动备份频率">
+              <button
+                v-for="opt in BACKUP_FREQ_OPTIONS"
+                :key="opt.value"
+                type="button"
+                class="freq-seg__item"
+                :class="{
+                  active: (settingsStore.settings.backupFrequency ?? 'weekly') === opt.value
+                }"
+                @click="settingsStore.updateSettings({ backupFrequency: opt.value })"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
       <div v-else class="login-prompt">
         <div class="login-prompt__content">
@@ -475,6 +498,14 @@ const emit = defineEmits<{
   (event: 'openAiSettings'): void
 }>()
 const router = useRouter()
+
+// 自动备份频率选项（与 UserSettings.backupFrequency 对齐）
+const BACKUP_FREQ_OPTIONS = [
+  { value: 'daily', label: '每天' },
+  { value: 'weekly', label: '每 7 天' },
+  { value: 'monthly', label: '每月' },
+  { value: 'off', label: '关闭' }
+] as const
 
 const websiteStore = useWebsiteStore()
 const categoryStore = useCategoryStore()
@@ -1553,5 +1584,34 @@ input:checked + .slider::before {
 
 .confirm-btn {
   min-width: 92px;
+}
+
+.freq-seg {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.freq-seg__item {
+  padding: 5px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.12));
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: var(--bg-tile);
+  }
+
+  &.active {
+    background: var(--primary-soft);
+    color: var(--color-primary-dark);
+    border-color: transparent;
+    font-weight: 600;
+  }
 }
 </style>
