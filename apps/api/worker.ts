@@ -17,7 +17,8 @@ import { httpServerHandler } from 'cloudflare:node'
 import type { FastifyInstance } from 'fastify'
 import { D1BindingClient } from '@nav/database'
 import { buildApp } from './app.js'
-import { databaseClient } from './src/services.js'
+import { databaseClient, dynamicBackupStorage } from './src/services.js'
+import { D1StorageClient } from './src/lib/d1-storage.js'
 
 type WorkerHandler = ReturnType<typeof httpServerHandler>
 
@@ -25,6 +26,7 @@ type AppState = {
   app: FastifyInstance
   handler: WorkerHandler
   initAppServices: () => Promise<void>
+  d1Storage: D1StorageClient | null
 }
 
 let appStatePromise: Promise<AppState> | null = null
@@ -38,6 +40,7 @@ async function createAppState(env: Record<string, unknown>): Promise<AppState> {
 
   // D1 原生绑定直连（优先于 HTTP API 客户端）
   const dbBinding = env.DB
+  const d1Storage = dbBinding ? new D1StorageClient(dbBinding) : null
   if (dbBinding) {
     databaseClient.setClient(new D1BindingClient({ binding: dbBinding as never }))
     app.log.info('D1 native binding activated')
@@ -70,7 +73,7 @@ async function createAppState(env: Record<string, unknown>): Promise<AppState> {
   // 完成 avvio 插件装配（路由上下文/钩子只在 preReady 后就绪）
   await app.ready()
 
-  return { app, handler, initAppServices }
+  return { app, handler, initAppServices, d1Storage }
 }
 
 /** 构建应用 + 桥接 node:http <-> Workers（仅执行一次） */
@@ -86,6 +89,17 @@ async function ensureServicesReady(state: AppState): Promise<void> {
   if (servicesReady) return
   try {
     await state.initAppServices()
+    // storage_purpose_configs 无配置时 initServices 会回退到 LocalClient——
+    // workerd 文件系统不持久，快照/备份会丢。未配置外部存储时改用 D1 blob 表。
+    if (state.d1Storage) {
+      const configured = await databaseClient.first(
+        'SELECT purpose FROM storage_purpose_configs LIMIT 1'
+      )
+      if (!configured) {
+        dynamicBackupStorage.setClient(state.d1Storage)
+        state.app.log.info('Backup storage switched to D1 blobs (no external storage configured)')
+      }
+    }
     servicesReady = true
     state.app.log.info('Services initialized (workers)')
   } catch (err) {
