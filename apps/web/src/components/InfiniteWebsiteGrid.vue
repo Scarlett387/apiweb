@@ -71,7 +71,9 @@ watch(
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 1rem;
-  align-items: start;
+
+  // 同一行卡片等高拉伸，保证尺寸一致（无论是否有标签/描述）
+  align-items: stretch;
 }
 
 .load-more {

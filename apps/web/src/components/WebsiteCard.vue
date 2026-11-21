@@ -472,8 +472,11 @@ setupFaviconObserver()
 }
 
 .website-card__body {
+  flex: 1;
   display: flex;
   flex-direction: column;
+  justify-content: flex-end;
+  min-height: 24px;
 }
 
 .website-card__tags {

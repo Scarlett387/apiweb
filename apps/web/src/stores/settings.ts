@@ -11,7 +11,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
   autoBackup: true,
   aiAnimationEnabled: true,
   defaultHome: 'home',
-  wallpaperMode: 'none',
+  // 默认开启必应每日壁纸：访客打开即见毛玻璃美化，无需任何权限
+  wallpaperMode: 'bing',
   wallpaperUrl: ''
 }
 
