@@ -14,6 +14,7 @@
   >
     <!-- 拖拽手柄 (Top Right) -->
     <button
+      v-if="!uiStore.isVisitor"
       class="drag-handle"
       :aria-label="`拖拽排序：${website.name}`"
       title="拖拽排序"
@@ -113,7 +114,7 @@
         </div>
 
         <!-- 悬浮操作按钮 (Bottom Right) -->
-        <div v-if="showActions" class="website-card__actions">
+        <div v-if="showActions && !uiStore.isVisitor" class="website-card__actions">
           <WebsiteCardActions
             :website="website"
             @favorite-toggle="handleFavoriteToggle"
@@ -142,6 +143,7 @@ import { useTagStore } from '@/stores/tag'
 import type { Website, Tag } from '@/types'
 import { formatVisitCountCompact, formatDateTimeZh, formatLastVisitedZh } from '@/utils/helpers'
 import WebsiteCardActions from '@/components/WebsiteCardActions.vue'
+import { useUIStore } from '@/stores/ui'
 
 const props = withDefaults(defineProps<Props>(), {
   showVisitCount: true,
@@ -155,6 +157,8 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const emit = defineEmits<Emits>()
+
+const uiStore = useUIStore()
 
 defineOptions({ name: 'WebsiteCard' })
 

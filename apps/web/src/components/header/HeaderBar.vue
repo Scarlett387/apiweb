@@ -35,7 +35,7 @@
 
       <div class="rail__end">
         <!-- Soft compose control — utility, not a marketing CTA -->
-        <button type="button" class="compose" @click="emit('addSite')">
+        <button v-if="!uiStore.isVisitor" type="button" class="compose" @click="emit('addSite')">
           <span class="compose__glyph" aria-hidden="true">
             <i class="fas fa-plus" />
           </span>
@@ -129,11 +129,13 @@ import { useRouter } from 'vue-router'
 import { NAVIGATION_BRAND_CONFIG } from '@nav/config/brand'
 import { useSettingsStore, isNavIconUrl, isNavIconFa } from '@/stores/settings'
 import { useAuthStore } from '@/stores/auth'
+import { useUIStore } from '@/stores/ui'
 
 const emit = defineEmits(['addSite', 'openAccountPanel'])
 const router = useRouter()
 const settingsStore = useSettingsStore()
 const authStore = useAuthStore()
+const uiStore = useUIStore()
 
 const navTitle = computed(
   () => settingsStore.effectiveNavTitle || NAVIGATION_BRAND_CONFIG.defaultTitle

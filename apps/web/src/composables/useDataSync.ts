@@ -8,6 +8,14 @@ import { useUIStore } from '@/stores/ui'
 import { useAIStore } from '@/stores/ai'
 import { useSettingsStore } from '@/stores/settings'
 import { captureAccountSession, isCurrentAccountSession } from '@/utils/account-session'
+import { request } from '@/utils/http'
+import { logger } from '@nav/logger'
+
+interface PublicNavPayload {
+  websites: Record<string, unknown>[]
+  categories: Record<string, unknown>[]
+  tags: Record<string, unknown>[]
+}
 
 const SYNC_DEBOUNCE_MS = 2000
 const SYNC_REFRESH_INTERVAL_MS = 60 * 1000
@@ -30,6 +38,28 @@ export function useDataSync() {
   let syncTimer: number | null = null
   let refreshTimer: number | null = null
   let localSyncInFlight = false
+
+  // 访客模式：拉取站主公开分享的导航数据（只读），灌入本地 store。
+  // 失败静默——访客看到空数据即可，不打扰。
+  let visitorHydrated = false
+  const hydrateVisitorData = async () => {
+    if (visitorHydrated) return
+    visitorHydrated = true
+    try {
+      const res = await request.get<{ data: PublicNavPayload }>('/api/public/nav')
+      if (res?.success && res.data) {
+        const { websites, categories, tags } = res.data
+        if (Array.isArray(websites)) websiteStore.overwriteWebsites(websites as never[])
+        if (Array.isArray(categories)) categoryStore.overwriteCategories(categories as never[])
+        if (Array.isArray(tags)) tagStore.overwriteTags(tags as never[])
+      }
+    } catch (err) {
+      logger.warn(
+        `[Visitor] 公开导航数据加载失败: ${err instanceof Error ? err.message : String(err)}`
+      )
+      visitorHydrated = false // 允许下次会话检查时重试
+    }
+  }
 
   const showBookmarkImportOnboarding = (userId: string) => {
     if (websiteStore.websites.length > 0) return
@@ -100,6 +130,7 @@ export function useDataSync() {
         settingsStore.activateAccountPreferences(userId)
 
         if (userId) {
+          uiStore.setVisitorMode(false)
           const session = captureAccountSession()
           const shouldShowLoading = !isStartupRefresh
           if (shouldShowLoading) {
@@ -125,6 +156,9 @@ export function useDataSync() {
             })
           return
         }
+        // 未登录 → 访客模式：加载站主公开导航数据（只读浏览）
+        uiStore.setVisitorMode(true)
+        void hydrateVisitorData()
         uiStore.setLoading(false)
       },
       // Run before other watchers (e.g. auto-backup) react to the same login edge.

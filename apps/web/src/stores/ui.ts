@@ -27,6 +27,11 @@ export const useUIStore = defineStore('ui', () => {
   const isLoading = ref(false)
   const loadingMessage = ref('加载中…')
   const sidebarOpen = ref(false)
+  // 访客模式：未登录用户浏览站主公开分享的导航数据（只读）
+  const isVisitor = ref(false)
+  const setVisitorMode = (value: boolean) => {
+    isVisitor.value = value
+  }
 
   const openModal = <K extends keyof ModalState>(modalName: K, data?: ModalPayloads[K]) => {
     modalState.value[modalName] = true
@@ -92,6 +97,8 @@ export const useUIStore = defineStore('ui', () => {
     isLoading,
     loadingMessage,
     sidebarOpen,
+    isVisitor,
+    setVisitorMode,
     openModal,
     closeModal,
     closeAllModals,

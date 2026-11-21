@@ -5,6 +5,7 @@
       <div class="filter-header">
         <label class="filter-label">标签</label>
         <BaseButton
+          v-if="!isVisitor"
           variant="neutral-ghost"
           size="xs"
           icon="fas fa-pencil-alt"
@@ -17,6 +18,7 @@
       <div v-if="tags.length === 0" class="sidebar-empty-state">
         <p class="empty-desc-text">添加网站后，可用标签快速筛选。</p>
         <BaseButton
+          v-if="!isVisitor"
           class="create-first-btn"
           variant="neutral-ghost"
           size="xs"
@@ -44,6 +46,7 @@
       <div class="filter-header">
         <label class="filter-label">分类</label>
         <BaseButton
+          v-if="!isVisitor"
           variant="ghost"
           size="xs"
           icon="fas fa-pencil-alt"
@@ -61,6 +64,7 @@
           </button>
         </div>
         <BaseButton
+          v-if="!isVisitor"
           class="create-first-btn"
           variant="ghost"
           size="xs"
@@ -83,9 +87,21 @@
           v-for="category in categories"
           :key="category.id"
           class="category-item"
-          :class="{ active: selectedCategory === category.id }"
+          :class="{
+            active: selectedCategory === category.id,
+            dragging: dragCategoryId === category.id,
+            'drop-target': dropTargetCategoryId === category.id
+          }"
+          :draggable="!isVisitor"
           @click="$emit('selectCategory', category.id)"
+          @dragstart="onCategoryDragStart(category.id, $event)"
+          @dragover.prevent="onCategoryDragOver(category.id)"
+          @drop.prevent="onCategoryDrop(category.id)"
+          @dragend="onCategoryDragEnd"
         >
+          <span v-if="!isVisitor" class="category-grip" aria-hidden="true">
+            <i class="fas fa-grip-vertical" />
+          </span>
           <span class="category-name">{{ category.name }}</span>
         </button>
       </div>
@@ -94,23 +110,70 @@
 </template>
 
 <script setup lang="ts">
+import { ref, computed } from 'vue'
 import { BaseButton } from '@nav/ui'
 import ChoiceChip from '@/components/ChoiceChip.vue'
+import { useUIStore } from '@/stores/ui'
 import type { Tag, Category } from '@/types'
 
-defineProps<{
+const props = defineProps<{
   tags: readonly Tag[]
   categories: readonly Category[]
   selectedTags: string[]
   selectedCategory: string
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'toggleTag', id: string): void
   (e: 'selectCategory', id: string): void
   (e: 'manageTags'): void
   (e: 'manageCategories'): void
+  (e: 'reorderCategories', newOrderIds: string[]): void
 }>()
+
+const uiStore = useUIStore()
+const isVisitor = computed(() => uiStore.isVisitor)
+
+// —— 分类拖动排序 ——
+const dragCategoryId = ref<string | null>(null)
+const dropTargetCategoryId = ref<string | null>(null)
+
+const onCategoryDragStart = (id: string, evt: DragEvent) => {
+  if (isVisitor.value) {
+    evt.preventDefault()
+    return
+  }
+  dragCategoryId.value = id
+  evt.dataTransfer?.setData('text/plain', id)
+  if (evt.dataTransfer) evt.dataTransfer.effectAllowed = 'move'
+}
+
+const onCategoryDragOver = (id: string) => {
+  if (!dragCategoryId.value || dragCategoryId.value === id) return
+  dropTargetCategoryId.value = id
+}
+
+const onCategoryDrop = (targetId: string) => {
+  const sourceId = dragCategoryId.value
+  if (!sourceId || sourceId === targetId) {
+    onCategoryDragEnd()
+    return
+  }
+  // 以当前渲染顺序（已按 order 排好）为基础重排
+  const ids = props.categories.map(c => c.id)
+  const fromIdx = ids.indexOf(sourceId)
+  const toIdx = ids.indexOf(targetId)
+  if (fromIdx !== -1 && toIdx !== -1) {
+    ids.splice(toIdx, 0, ids.splice(fromIdx, 1)[0])
+    emit('reorderCategories', ids)
+  }
+  onCategoryDragEnd()
+}
+
+const onCategoryDragEnd = () => {
+  dragCategoryId.value = null
+  dropTargetCategoryId.value = null
+}
 </script>
 
 <style scoped lang="scss">
@@ -225,6 +288,7 @@ defineEmits<{
 .category-item {
   display: flex;
   align-items: center;
+  gap: 6px;
   padding: 8px 12px;
   min-height: 0;
   min-width: 0;
@@ -252,6 +316,33 @@ defineEmits<{
   &:focus-visible {
     outline: 2px solid rgba(var(--color-primary-rgb), 0.4);
     outline-offset: 2px;
+  }
+
+  // 拖动排序
+  &[draggable='true'] {
+    cursor: grab;
+  }
+
+  &.dragging {
+    opacity: 0.45;
+    cursor: grabbing;
+  }
+
+  &.drop-target {
+    box-shadow: inset 0 2px 0 0 var(--color-primary);
+    background-color: var(--primary-soft);
+  }
+}
+
+.category-grip {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--text-muted);
+  opacity: 0;
+  transition: opacity 0.15s;
+
+  .category-item:hover & {
+    opacity: 0.7;
   }
 }
 
