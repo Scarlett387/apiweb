@@ -32,10 +32,9 @@ const publicRoutes: FastifyPluginAsyncZod = async app => {
       })
     }
     try {
-      const res = await fetch(
-        'https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1',
-        { headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' } }
-      )
+      const res = await fetch('https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1', {
+        headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+      })
       if (!res.ok) throw new Error(`bing responded ${res.status}`)
       const json = (await res.json()) as { images?: { url?: string }[] }
       const raw = json.images?.[0]?.url

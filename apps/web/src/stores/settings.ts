@@ -73,8 +73,7 @@ function normalizeSettings(raw: Partial<UserSettings> | null | undefined): UserS
         ? raw.wallpaperMode
         : DEFAULT_SETTINGS.wallpaperMode,
     wallpaperUrl:
-      typeof raw?.wallpaperUrl === 'string' &&
-      /^https?:\/\/.+/i.test(raw.wallpaperUrl.trim())
+      typeof raw?.wallpaperUrl === 'string' && /^https?:\/\/.+/i.test(raw.wallpaperUrl.trim())
         ? raw.wallpaperUrl.trim()
         : DEFAULT_SETTINGS.wallpaperUrl
   }
@@ -308,8 +307,7 @@ export const useSettingsStore = defineStore('settings', () => {
     }
     // 壁纸开启时给根节点加标记，全局玻璃样式依赖该类名。
     const mode = settings.value.wallpaperMode || 'none'
-    const wallpaperActive =
-      mode === 'bing' || (mode === 'url' && !!settings.value.wallpaperUrl)
+    const wallpaperActive = mode === 'bing' || (mode === 'url' && !!settings.value.wallpaperUrl)
     root.classList.toggle('has-wallpaper', wallpaperActive)
   }
 

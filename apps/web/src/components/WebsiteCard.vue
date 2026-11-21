@@ -57,8 +57,13 @@
               v-html="titleHtml"
             />
           </h3>
-          <p :id="descId" class="website-card__description" :title="website.description || ''">
-            {{ website.description || '' }}
+          <p
+            v-if="website.description"
+            :id="descId"
+            class="website-card__description"
+            :title="website.description"
+          >
+            {{ website.description }}
           </p>
         </div>
       </header>
@@ -374,11 +379,11 @@ setupFaviconObserver()
 }
 
 .website-card__content {
-  padding: var(--spacing-xl);
+  padding: var(--spacing-md);
   display: flex;
   flex-direction: column;
   height: 100%;
-  gap: var(--spacing-lg);
+  gap: var(--spacing-sm);
   overflow: hidden;
   max-width: 100%;
 }
@@ -393,8 +398,8 @@ setupFaviconObserver()
 
 .website-card__favicon {
   flex-shrink: 0;
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
   border-radius: var(--radius-md);
   overflow: hidden;
   background-color: var(--bg-body);
@@ -462,23 +467,19 @@ setupFaviconObserver()
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
-  min-height: 3em;
   width: 100%;
   overflow-wrap: break-word;
 }
 
 .website-card__body {
-  flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
 }
 
 .website-card__tags {
   display: flex;
   flex-wrap: wrap;
   gap: var(--spacing-xs);
-  min-height: 20px;
 }
 
 .website-card__tag {
@@ -500,13 +501,13 @@ setupFaviconObserver()
 }
 
 .website-card__footer {
-  padding-top: var(--spacing-sm);
+  padding-top: var(--spacing-xs);
   border-top: 1px solid var(--border-tile);
-  margin-top: auto;
+  margin-top: var(--spacing-xs);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  height: 32px;
+  height: 28px;
 }
 
 .website-card__stats {

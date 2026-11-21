@@ -64,7 +64,9 @@
               <span v-if="regSaving" class="reg-status">保存中…</span>
               <span v-else-if="regError" class="reg-status reg-status--err">{{ regError }}</span>
             </div>
-            <div class="launch__hint">开启后，访客可在登录页注册新账号；关闭则只有已有账号能登录</div>
+            <div class="launch__hint">
+              开启后，访客可在登录页注册新账号；关闭则只有已有账号能登录
+            </div>
           </div>
           <button
             type="button"

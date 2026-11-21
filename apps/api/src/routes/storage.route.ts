@@ -12,7 +12,9 @@ const storageRoutes: FastifyPluginAsync = async app => {
   app.get('/storage/blob/*', async (req, reply) => {
     const key = decodeURIComponent((req.params as Record<string, string>)['*'] || '')
     if (!key || key.includes('..')) {
-      return reply.code(400).send({ success: false, code: 'BAD_REQUEST', message: '无效的资源路径' })
+      return reply
+        .code(400)
+        .send({ success: false, code: 'BAD_REQUEST', message: '无效的资源路径' })
     }
 
     const client = dynamicPublicStorage.getClient()

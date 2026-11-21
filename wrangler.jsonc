@@ -14,16 +14,20 @@
     "directory": "apps/web/dist",
     "not_found_handling": "single-page-application"
   },
-  // D1 数据库原生绑定：部署前把 database_id 换成你自己的 D1 数据库 ID
+  "account_id": "be6085bd4a0ac994d0b64de4fbe57512",
+  // D1 数据库原生绑定：绑定到账号里的 apiweb-d1
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "diy-nav-db",
-      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+      "database_name": "apiweb-d1",
+      "database_id": "646fa7fa-b9aa-4641-83cb-edb5be462935"
     }
   ],
   "vars": {
-    "NODE_ENV": "production"
+    "NODE_ENV": "production",
+    // 首次部署引导用；随后会转存为加密 Secret 并从本文件移除（勿提交真实密钥到公开仓库）
+    "JWT_SECRET": "f0dac1e7b641065b5e6e77b91a1644fceadaafa05f168ddf57ad27c21ebbc7fe",
+    "OAUTH_CONFIG_ENCRYPTION_KEY": "411ea8e2bba61a959fbfd946cd54242e75af7e7257657f54ece1ecf421f3280f"
   },
   "observability": {
     "enabled": true

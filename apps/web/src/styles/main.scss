@@ -411,8 +411,7 @@ body,
 
 // ═══════════════════════════════════════════════════
 //  壁纸 + 毛玻璃模式（html.has-wallpaper 时启用）
-//  仅磨砂化面板容器：顶栏 / 搜索框 / 侧栏 / 弹窗。
-//  站点卡片样式刻意保持原样。
+//  磨砂化面板容器：顶栏 / 搜索框 / 侧栏 / 弹窗 / 站点卡片。
 // ═══════════════════════════════════════════════════
 html.has-wallpaper {
   body,
@@ -502,5 +501,33 @@ html.has-wallpaper {
 
   [data-theme='dark'] .modal-container {
     background: rgba(9, 14, 26, 0.8) !important;
+  }
+
+  // —— 站点卡片：白底 → 毛玻璃 ——
+  .website-card {
+    background: rgba(255, 255, 255, 0.55) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    backdrop-filter: blur(20px) saturate(160%);
+    border-color: rgba(255, 255, 255, 0.45) !important;
+    box-shadow: 0 8px 28px rgba(15, 23, 42, 0.1);
+  }
+
+  [data-theme='dark'] .website-card {
+    background: rgba(9, 14, 26, 0.55) !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  }
+
+  // —— “添加网站”虚线卡片 ——
+  .add-card {
+    background-color: rgba(255, 255, 255, 0.35) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    backdrop-filter: blur(20px) saturate(160%);
+    border-color: rgba(255, 255, 255, 0.5) !important;
+  }
+
+  [data-theme='dark'] .add-card {
+    background-color: rgba(9, 14, 26, 0.45) !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
   }
 }
