@@ -5,6 +5,15 @@
     <link rel="icon" type="image/svg+xml" href="%BASE_URL%vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>__NAVIGATION_DEFAULT_TITLE__</title>
+    <!-- 分享到微信/QQ/Telegram 时的标题摘要预览图（爬虫不执行 JS，须为静态标签） -->
+    <meta name="description" content="API 导航 — 精选网站、分类导航、一键直达的个人导航站" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="API 导航" />
+    <meta property="og:title" content="API 导航" />
+    <meta property="og:description" content="精选网站 · 分类导航 · 一键直达" />
+    <meta property="og:url" content="https://apiweb.us.ci/" />
+    <meta property="og:image" content="https://apiweb.us.ci/og-image.png" />
+    <meta name="twitter:card" content="summary_large_image" />
     <!-- 站点品牌引导脚本（由 API 动态生成，逻辑见 apps/api/src/lib/site-boot.ts）：
          渲染前同步写入后台配置的站点名/Logo 并设置标签页标题，消除首屏品牌闪烁。
          加载失败（API 不可用）时页面正常渲染，回退构建期默认标题与前端本地缓存。 -->

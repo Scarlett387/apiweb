@@ -83,6 +83,33 @@
         </div>
       </div>
     </section>
+
+    <!-- 图标管理（仅管理员可见） -->
+    <section v-if="showSiteAdmin" class="prefs-card">
+      <div class="prefs-card__body">
+        <div class="preference-row">
+          <div class="launch__copy">
+            <div class="launch__title">
+              刷新站点图标
+              <span v-if="iconProgress" class="reg-status">{{ iconProgress }}</span>
+              <span v-else-if="iconError" class="reg-status reg-status--err">{{ iconError }}</span>
+            </div>
+            <div class="launch__hint">
+              目标网站更换图标后可重新抓取；过程约需一两分钟，请保持页面打开
+            </div>
+          </div>
+          <button
+            type="button"
+            class="icon-refresh-btn"
+            :disabled="iconRefreshing"
+            title="刷新全部站点图标"
+            @click="startIconRefresh"
+          >
+            <i class="fas fa-sync-alt" :class="{ 'fa-spin': iconRefreshing }" />
+          </button>
+        </div>
+      </div>
+    </section>
     <!-- 背景壁纸（毛玻璃模式） -->
     <section class="prefs-card">
       <div class="prefs-card__body">
@@ -153,10 +180,12 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useAuthStore } from '@/stores/auth'
-import { getSiteSettings, updateSiteSettings } from '@/api/admin'
+import { useUIStore } from '@/stores/ui'
+import { getSiteSettings, updateSiteSettings, refreshIconsBatch } from '@/api/admin'
 
 const store = useSettingsStore()
 const authStore = useAuthStore()
+const uiStore = useUIStore()
 
 const current = store.settings.defaultHome
 const validDefault = (['home', 'all'].includes(current || '') ? current : 'home') as 'home' | 'all'
@@ -248,6 +277,47 @@ const toggleRegistration = async () => {
     regSaving.value = false
   }
 }
+
+// ── 图标批量刷新（仅管理员可见）：游标分批循环调用，避开 Workers 子请求限额 ──
+const iconRefreshing = ref(false)
+const iconProgress = ref('')
+const iconError = ref('')
+
+const startIconRefresh = async () => {
+  if (iconRefreshing.value) return
+  iconRefreshing.value = true
+  iconError.value = ''
+  let cursor = 0
+  let totalUpdated = 0
+  let totalFailed = 0
+  try {
+    for (;;) {
+      const res = await refreshIconsBatch(cursor)
+      if (!res.success || !res.data) {
+        throw new Error(res.message || '刷新失败')
+      }
+      const d = res.data
+      totalUpdated += d.updated
+      totalFailed += d.failed
+      iconProgress.value = d.done ? `完成：更新 ${totalUpdated} 个` : `${d.nextCursor}/${d.total}…`
+      cursor = d.nextCursor
+      if (d.done) break
+    }
+    if (totalUpdated > 0) {
+      uiStore.showToast(`图标刷新完成，更新 ${totalUpdated} 个`, 'success')
+      window.location.reload()
+    } else {
+      uiStore.showToast('图标已是最新的', 'success')
+    }
+  } catch (err) {
+    iconError.value = err instanceof Error ? err.message : '刷新失败，请重试'
+  } finally {
+    iconRefreshing.value = false
+    setTimeout(() => {
+      iconProgress.value = ''
+    }, 4000)
+  }
+}
 </script>
 
 <style scoped lang="scss">
@@ -276,6 +346,29 @@ const toggleRegistration = async () => {
 
   &--err {
     color: #ef4444;
+  }
+}
+
+.icon-refresh-btn {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.1));
+  background: var(--bg-tile);
+  color: var(--text-secondary);
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover:not(:disabled) {
+    background: var(--primary-soft);
+    color: var(--color-primary-dark);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 }
 

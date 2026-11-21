@@ -8,7 +8,10 @@ import {
   siteSettingsService,
   verificationEmailSender,
   emailBindingService,
-  adminAuditLogService
+  adminAuditLogService,
+  syncService,
+  iconService,
+  databaseClient
 } from '../services.js'
 import { toUserDto } from '../lib/dto.js'
 import { OAUTH_PROVIDER_NAMES, type OAuthProviderName } from '../lib/oauth-provider-config.js'
@@ -103,6 +106,80 @@ const adminRoutes: FastifyPluginAsyncZod = async app => {
       throw new AppError('需要管理员权限', 'ADMIN_REQUIRED', 403)
     }
   }
+
+  // ── 站点图标批量刷新 ──────────────────────────────────────────────
+  // 每次调用处理一小批（Workers 子请求限额约 50/请求，每站约耗 3-5 个），
+  // 返回 nextCursor 供前端循环调用直到 done。
+  const iconRefreshBodySchema = z.object({
+    cursor: z.coerce.number().int().min(0).default(0),
+    batch: z.coerce.number().int().min(1).max(12).default(8)
+  })
+
+  app.post(
+    '/admin/icons/refresh',
+    { onRequest: [app.authenticate], schema: { body: iconRefreshBodySchema } },
+    async req => {
+      await requireAdmin(req.user.sub)
+
+      // 站主 = 最近活跃的云端同步用户（与公开数据端点一致）
+      const owner = await databaseClient.first<{ user_id: string }>(
+        `SELECT user_id FROM user_sync_state
+         WHERE enabled = 1 AND current_storage_key IS NOT NULL
+         ORDER BY updated_at DESC LIMIT 1`
+      )
+      if (!owner) {
+        throw new AppError('站主尚未发布导航数据', 'NO_PUBLIC_DATA', 404)
+      }
+
+      const snapshot = await syncService.getSnapshot(owner.user_id)
+      if (!snapshot) {
+        throw new AppError('无法读取站主快照', 'NO_SNAPSHOT', 404)
+      }
+
+      const websites = snapshot.data.websites
+      const { cursor, batch } = req.body
+      const slice = websites.slice(cursor, cursor + batch)
+
+      let updated = 0
+      let failed = 0
+      for (const w of slice) {
+        try {
+          if (!w.url) continue
+          const result = await iconService.getIconUrl(w.url, true)
+          if (result.source !== 'default' && result.url) {
+            if (w.favicon !== result.url) {
+              w.favicon = result.url
+              updated++
+            }
+          } else {
+            failed++
+          }
+        } catch {
+          failed++
+        }
+      }
+
+      // 有图标更新则回写快照并推进云端哈希（乐观锁，冲突则报错让前端重试）
+      const nextCursor = cursor + slice.length
+      const done = nextCursor >= websites.length
+      if (updated > 0 || done) {
+        const state = await syncService.getState(owner.user_id)
+        await syncService.updateSnapshot(owner.user_id, snapshot, state.currentHash)
+      }
+
+      return {
+        success: true,
+        data: {
+          processed: slice.length,
+          updated,
+          failed,
+          nextCursor,
+          total: websites.length,
+          done
+        }
+      }
+    }
+  )
 
   // List users with role and status filtering
   app.get(

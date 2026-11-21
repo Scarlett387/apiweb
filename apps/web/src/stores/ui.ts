@@ -32,10 +32,18 @@ export const useUIStore = defineStore('ui', () => {
   const setVisitorMode = (value: boolean) => {
     isVisitor.value = value
   }
-  // 云端分享数据的网站 id 集合：访客对这些条目只读，自己本地新增的仍可管理
+  // 云端分享数据的 id 集合：访客对这些条目只读；登录认领匿名工作区时剥离，防止污染账号
   const sharedWebsiteIds = ref<Set<string>>(new Set())
+  const sharedCategoryIds = ref<Set<string>>(new Set())
+  const sharedTagIds = ref<Set<string>>(new Set())
   const setSharedWebsiteIds = (ids: Set<string>) => {
     sharedWebsiteIds.value = ids
+  }
+  const setSharedCategoryIds = (ids: Set<string>) => {
+    sharedCategoryIds.value = ids
+  }
+  const setSharedTagIds = (ids: Set<string>) => {
+    sharedTagIds.value = ids
   }
 
   const openModal = <K extends keyof ModalState>(modalName: K, data?: ModalPayloads[K]) => {
@@ -106,6 +114,10 @@ export const useUIStore = defineStore('ui', () => {
     setVisitorMode,
     sharedWebsiteIds,
     setSharedWebsiteIds,
+    sharedCategoryIds,
+    setSharedCategoryIds,
+    sharedTagIds,
+    setSharedTagIds,
     openModal,
     closeModal,
     closeAllModals,

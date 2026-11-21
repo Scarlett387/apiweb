@@ -335,6 +335,9 @@ const onFavoriteToggle = (websiteId: string) => {
   .content-layout {
     flex-direction: column;
     gap: 1rem;
+
+    // 纵向排列下取消 flex-start，让内容区恢复满宽（否则卡片缩成内容宽度）
+    align-items: stretch;
   }
 
   /* Sidebar becomes a horizontal scrollable bar on mobile */

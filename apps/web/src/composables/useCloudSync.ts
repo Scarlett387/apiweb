@@ -727,7 +727,18 @@ export function useCloudSync() {
 
     const owner = getWorkspaceOwner()
     if (owner.kind === 'anonymous') {
-      const anonymousData = exportSyncPayload().data
+      const rawAnonymousData = exportSyncPayload().data
+      // 剥离访客模式下灌入的站主公开分享数据：
+      // 访客随后注册/登录自己的账号时，这些条目不应被"认领"进其账号并同步上云。
+      // 只剥离分享条目本身，访客自己本地新增的网站照常保留。
+      const sharedSites = uiStore.sharedWebsiteIds
+      const sharedCats = uiStore.sharedCategoryIds
+      const sharedTags = uiStore.sharedTagIds
+      const anonymousData = {
+        websites: rawAnonymousData.websites.filter(w => !sharedSites.has(w.id)),
+        categories: rawAnonymousData.categories.filter(c => !sharedCats.has(c.id)),
+        tags: rawAnonymousData.tags.filter(t => !sharedTags.has(t.id))
+      }
       const userOwner = { kind: 'user' as const, userId: expectedUserId }
       const userData = readWorkspaceData(userOwner)
       const anonymousHasData =

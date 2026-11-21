@@ -208,6 +208,23 @@ export const updateSiteSettings = (payload: UpdateSiteSettingsPayload) =>
   request.patch<AdminSiteSettingsConfig>('/api/admin/config/site', payload)
 
 // ─────────────────────────────────────────────
+//  Icon Refresh（站点图标批量刷新，游标分批）
+// ─────────────────────────────────────────────
+
+export interface IconRefreshResult {
+  processed: number
+  updated: number
+  failed: number
+  nextCursor: number
+  total: number
+  done: boolean
+}
+
+/** POST /admin/icons/refresh —— 每次刷新一小批图标，循环调用直到 done */
+export const refreshIconsBatch = (cursor: number, batch = 8) =>
+  request.post<IconRefreshResult>('/api/admin/icons/refresh', { cursor, batch })
+
+// ─────────────────────────────────────────────
 //  Admin Audit Logs
 // ─────────────────────────────────────────────
 

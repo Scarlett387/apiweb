@@ -70,6 +70,10 @@ export function useDataSync() {
           )
         }
         if (Array.isArray(categories)) {
+          // 记录分享分类 id：登录认领匿名工作区时剥离，防止把站主数据同步进访客账号
+          uiStore.setSharedCategoryIds(
+            new Set(categories.map(c => String((c as { id?: unknown }).id)).filter(Boolean))
+          )
           categoryStore.overwriteCategories(
             mergeById(
               categories as { id: string }[],
@@ -78,6 +82,9 @@ export function useDataSync() {
           )
         }
         if (Array.isArray(tags)) {
+          uiStore.setSharedTagIds(
+            new Set(tags.map(t => String((t as { id?: unknown }).id)).filter(Boolean))
+          )
           tagStore.overwriteTags(
             mergeById(
               tags as { id: string }[],
