@@ -195,7 +195,10 @@ import { computeReorderedIds } from '@/utils/helpers'
 const categoryStore = useCategoryStore()
 const websiteStore = useWebsiteStore()
 
-const categories = computed(() => categoryStore.categories)
+// 按 order 排序：拖动换序后列表立即跟着变（store 只更新 order 值，数组顺序不变）
+const categories = computed(() =>
+  [...categoryStore.categories].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+)
 const isAdding = ref(false)
 const newCategoryName = ref('')
 const newCategoryIcon = ref('fas fa-folder')

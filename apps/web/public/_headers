@@ -1,0 +1,10 @@
+# HTML 入口不缓存：每次都校验最新版本，避免用户浏览器滞留旧版页面
+/index.html
+  Cache-Control: no-cache, must-revalidate
+
+/*
+  Cache-Control: no-cache, must-revalidate
+
+# 带 hash 的静态资源可长缓存（文件名变化即换 URL）
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
