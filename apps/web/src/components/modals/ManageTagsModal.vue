@@ -21,6 +21,7 @@
             :editing="editingId === tag.id"
             :usage-count="getWebsiteCount(tag.id)"
             :updating="updating"
+            :can-manage="canManageTag(tag)"
             @edit="startEdit(tag)"
             @delete="handleDeleteTag(tag)"
             @save="handleSave"
@@ -107,6 +108,7 @@
 import { ref, computed, nextTick, watch } from 'vue'
 import { useTagStore } from '@/stores/tag'
 import { useWebsiteStore } from '@/stores/website'
+import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 import { BaseInput, BaseButton, BaseModal, ColorPicker } from '@nav/ui'
 import type { Tag } from '@/types'
@@ -117,7 +119,14 @@ import TagListItem from './parts/TagListItem.vue'
 // Store
 const tagStore = useTagStore()
 const websiteStore = useWebsiteStore()
+const authStore = useAuthStore()
 const uiStore = useUIStore()
+
+// 管理权限：登录=全部可管理；未登录（访客）=只能管理自己本地新建的标签
+const canManageTag = (tag: Tag) => {
+  if (authStore.isAuthenticated) return true
+  return !uiStore.sharedTagIds.has(tag.id)
+}
 
 const tagNameInputRef = ref()
 

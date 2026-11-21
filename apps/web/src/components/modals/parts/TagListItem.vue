@@ -45,7 +45,7 @@
       <span class="color-dot" :style="{ backgroundColor: tag.color }" />
       <span class="name">{{ tag.name }}</span>
       <span class="count">{{ usageCount }}</span>
-      <div class="item-actions">
+      <div v-if="canManage" class="item-actions">
         <BaseButton
           variant="ghost"
           size="sm"
@@ -72,7 +72,16 @@ import { ref, watchEffect } from 'vue'
 import { BaseButton, BaseInput, ColorPicker } from '@nav/ui'
 import type { Tag } from '@/types'
 
-const props = defineProps<{ tag: Tag; editing: boolean; usageCount: number; updating: boolean }>()
+const props = withDefaults(
+  defineProps<{
+    tag: Tag
+    editing: boolean
+    usageCount: number
+    updating: boolean
+    canManage?: boolean
+  }>(),
+  { canManage: true }
+)
 const emit = defineEmits<{
   (e: 'edit'): void
   (e: 'delete'): void

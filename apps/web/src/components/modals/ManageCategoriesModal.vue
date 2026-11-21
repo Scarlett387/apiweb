@@ -84,34 +84,36 @@
                 <span class="category-item__count">{{ getCategoryCount(category.id) }}</span>
               </div>
               <div class="category-item__actions">
-                <BaseButton
-                  variant="ghost"
-                  size="sm"
-                  :icon="category.isPublic === false ? 'fas fa-eye-slash' : 'fas fa-eye'"
-                  :title="
-                    category.isPublic === false
-                      ? '当前：私密（仅自己可见）——点击设为公开'
-                      : '当前：公开（访客可见）——点击设为私密'
-                  "
-                  :aria-label="`切换分类 ${category.name} 的公开状态`"
-                  @click="togglePublic(category)"
-                />
-                <BaseButton
-                  variant="ghost"
-                  size="sm"
-                  icon="fas fa-pencil-alt"
-                  title="编辑"
-                  :aria-label="`编辑分类 ${category.name}`"
-                  @click="startEdit(category)"
-                />
-                <BaseButton
-                  variant="danger-ghost"
-                  size="sm"
-                  icon="fas fa-trash-alt"
-                  title="删除"
-                  :aria-label="`删除分类 ${category.name}`"
-                  @click="confirmDelete(category)"
-                />
+                <template v-if="canManageCategory(category)">
+                  <BaseButton
+                    variant="ghost"
+                    size="sm"
+                    :icon="category.isPublic === false ? 'fas fa-eye-slash' : 'fas fa-eye'"
+                    :title="
+                      category.isPublic === false
+                        ? '当前：私密（仅自己可见）——点击设为公开'
+                        : '当前：公开（访客可见）——点击设为私密'
+                    "
+                    :aria-label="`切换分类 ${category.name} 的公开状态`"
+                    @click="togglePublic(category)"
+                  />
+                  <BaseButton
+                    variant="ghost"
+                    size="sm"
+                    icon="fas fa-pencil-alt"
+                    title="编辑"
+                    :aria-label="`编辑分类 ${category.name}`"
+                    @click="startEdit(category)"
+                  />
+                  <BaseButton
+                    variant="danger-ghost"
+                    size="sm"
+                    icon="fas fa-trash-alt"
+                    title="删除"
+                    :aria-label="`删除分类 ${category.name}`"
+                    @click="confirmDelete(category)"
+                  />
+                </template>
               </div>
             </div>
           </div>
@@ -188,12 +190,16 @@
 import { ref, computed } from 'vue'
 import { useCategoryStore } from '@/stores/category'
 import { useWebsiteStore } from '@/stores/website'
+import { useAuthStore } from '@/stores/auth'
+import { useUIStore } from '@/stores/ui'
 import { BaseInput, BaseButton, BaseModal, IconPicker, EmptyState } from '@nav/ui'
 import type { Category } from '@/types'
 import { computeReorderedIds } from '@/utils/helpers'
 
 const categoryStore = useCategoryStore()
 const websiteStore = useWebsiteStore()
+const authStore = useAuthStore()
+const uiStore = useUIStore()
 
 // 按 order 排序：拖动换序后列表立即跟着变（store 只更新 order 值，数组顺序不变）
 const categories = computed(() =>
@@ -214,6 +220,13 @@ const editingForm = ref({
 
 const getCategoryCount = (id: string) => {
   return websiteStore.websites.filter(w => w.categoryId === id).length
+}
+
+// 管理权限：登录=全部可管理；未登录（访客）=只能管理自己本地新建的分类，
+// 站主分享来的分类只读（不能改公开状态、编辑或删除）
+const canManageCategory = (category: Category) => {
+  if (authStore.isAuthenticated) return true
+  return !uiStore.sharedCategoryIds.has(category.id)
 }
 const categoryAffectedCount = computed(() =>
   categoryToDelete.value ? getCategoryCount(categoryToDelete.value.id) : 0

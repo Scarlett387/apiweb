@@ -196,7 +196,16 @@ export function useDataSync() {
             })
           return
         }
-        // 未登录 → 访客模式：加载站主公开导航数据（只读浏览）
+        // 未登录 → 访客模式：先清空登录时加载的工作区数据（含隐匿分类等
+        // 站主私密内容），再重新拉取站主公开数据。
+        // 否则登出后浏览器 store 里会残留完整云端快照，私密分类依然可见。
+        websiteStore.overwriteWebsites([])
+        categoryStore.overwriteCategories([])
+        tagStore.clearAllTags()
+        uiStore.setSharedWebsiteIds(new Set())
+        uiStore.setSharedCategoryIds(new Set())
+        uiStore.setSharedTagIds(new Set())
+        visitorHydrated = false
         uiStore.setVisitorMode(true)
         void hydrateVisitorData()
         uiStore.setLoading(false)
