@@ -58,6 +58,10 @@ export function useDataSync() {
       if (res?.success && res.data) {
         const { websites, categories, tags } = res.data
         if (Array.isArray(websites)) {
+          // 记录云端分享的网站 id：访客对这些条目只读（不显示编辑/删除）
+          uiStore.setSharedWebsiteIds(
+            new Set(websites.map(w => String((w as { id?: unknown }).id)).filter(Boolean))
+          )
           websiteStore.overwriteWebsites(
             mergeById(
               websites as { id: string }[],

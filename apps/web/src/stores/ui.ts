@@ -32,6 +32,11 @@ export const useUIStore = defineStore('ui', () => {
   const setVisitorMode = (value: boolean) => {
     isVisitor.value = value
   }
+  // 云端分享数据的网站 id 集合：访客对这些条目只读，自己本地新增的仍可管理
+  const sharedWebsiteIds = ref<Set<string>>(new Set())
+  const setSharedWebsiteIds = (ids: Set<string>) => {
+    sharedWebsiteIds.value = ids
+  }
 
   const openModal = <K extends keyof ModalState>(modalName: K, data?: ModalPayloads[K]) => {
     modalState.value[modalName] = true
@@ -99,6 +104,8 @@ export const useUIStore = defineStore('ui', () => {
     sidebarOpen,
     isVisitor,
     setVisitorMode,
+    sharedWebsiteIds,
+    setSharedWebsiteIds,
     openModal,
     closeModal,
     closeAllModals,

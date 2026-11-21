@@ -113,7 +113,8 @@
         </div>
 
         <!-- 悬浮操作按钮 (Bottom Right) -->
-        <div v-if="showActions" class="website-card__actions">
+        <!-- 访客对云端分享的条目只读；对本地新增条目可管理 -->
+        <div v-if="showActions && canManage" class="website-card__actions">
           <WebsiteCardActions
             :website="website"
             @favorite-toggle="handleFavoriteToggle"
@@ -142,7 +143,9 @@ import { useTagStore } from '@/stores/tag'
 import type { Website, Tag } from '@/types'
 import { formatVisitCountCompact, formatDateTimeZh, formatLastVisitedZh } from '@/utils/helpers'
 import WebsiteCardActions from '@/components/WebsiteCardActions.vue'
+import { useUIStore } from '@/stores/ui'
 
+// 访客（未登录）：云端分享的网站只读，本地新增的网站可管理
 const props = withDefaults(defineProps<Props>(), {
   showVisitCount: true,
   showLastVisited: true,
@@ -155,6 +158,13 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const emit = defineEmits<Emits>()
+
+const uiStore = useUIStore()
+
+// 访客（未登录）：云端分享的网站只读，本地新增的网站可管理
+const canManage = computed(
+  () => !uiStore.isVisitor || !uiStore.sharedWebsiteIds.has(props.website.id)
+)
 
 defineOptions({ name: 'WebsiteCard' })
 
