@@ -28,6 +28,7 @@ import {
 } from './lib/storage-provider-config.js'
 import { SiteSettingsService } from './lib/site-settings.js'
 import { AdminAuditLogService } from './lib/admin-audit-log.js'
+import { NavCommunityService } from './lib/nav-community.js'
 import { logger } from '@nav/logger'
 
 // --- Database Client ---
@@ -214,6 +215,9 @@ export const siteSettingsService = new SiteSettingsService(
 // --- Admin Audit Log Service ---
 export const adminAuditLogService = new AdminAuditLogService(databaseClient)
 
+// --- Nav Community Service (健康检测 + 访客投稿) ---
+export const navCommunityService = new NavCommunityService(databaseClient)
+
 // --- Email Sender (credentials loaded from DB during initServices) ---
 export const verificationEmailSender = new SmtpVerificationEmailSender({
   user: undefined,
@@ -264,6 +268,12 @@ export const initServices = async (logger: FastifyBaseLogger): Promise<void> => 
     await storageProviderConfigService.initTable()
     await siteSettingsService.initTable()
     await adminAuditLogService.initTable()
+    // 社区能力(健康检测/投稿)是增强功能:初始化失败只降级,绝不拖垮同步主链路
+    try {
+      await navCommunityService.initTable()
+    } catch (e) {
+      logger.warn({ err: e }, 'Nav community tables init failed; features degraded')
+    }
 
     // Hydrate per-purpose storage clients and path configs from DB
     try {

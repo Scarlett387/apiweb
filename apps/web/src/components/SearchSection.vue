@@ -22,6 +22,44 @@
 
       <!-- Main Content -->
       <main class="main-content">
+        <!-- 站点统计条:收录数/在线数 + 管理员一键检测 -->
+        <div v-if="!searchKeyword" class="stats-bar" :class="{ 'is-loading': healthStore.loading }">
+          <template v-if="healthStore.hasData">
+            <span class="stats-item">
+              <b>{{ healthStore.total }}</b>
+              个站点
+            </span>
+            <span class="stats-dot" aria-hidden="true" />
+            <span class="stats-item">
+              <b>{{ healthStore.onlineCount }}</b>
+              个在线
+            </span>
+            <span v-if="healthStore.checkedAt" class="stats-checked">
+              检测于 {{ formatCheckedAgo(healthStore.checkedAt) }}
+            </span>
+          </template>
+          <template v-else>
+            <span class="stats-item">
+              <b>{{ filteredWebsites.length }}</b>
+              个站点
+            </span>
+          </template>
+          <span class="stats-spacer" />
+          <BaseButton
+            v-if="isAdmin"
+            variant="ghost"
+            size="xs"
+            shape="rounded"
+            class="health-check-btn"
+            :loading="healthChecking"
+            :title="healthStore.hasData ? '重新检测全部站点可用性' : '检测全部站点可用性'"
+            @click="runHealthCheck"
+          >
+            <i v-if="!healthChecking" class="fas fa-heart-pulse" />
+            {{ healthChecking ? `检测中 ${healthProgressText}` : '健康检测' }}
+          </BaseButton>
+        </div>
+
         <!-- Selected Conditions Bar -->
         <ActiveFiltersBar
           v-if="hasActiveFilters"
@@ -70,7 +108,7 @@
 
         <!-- Filtered Grid -->
         <div v-else>
-          <InfiniteWebsiteGrid :websites="filteredWebsites" :page-size="30" :initial-size="30">
+          <GroupedWebsiteGrid :websites="filteredWebsites">
             <template #default="{ website }">
               <div
                 class="website-draggable"
@@ -90,10 +128,7 @@
               </div>
             </template>
 
-            <template
-              v-if="filteredWebsites.length > 0 || websiteStore.websites.length === 0"
-              #add-card
-            >
+            <template #add-card>
               <div class="add-card" @click="onAddSite">
                 <div class="add-card-content">
                   <div class="add-icon">
@@ -103,7 +138,7 @@
                 </div>
               </div>
             </template>
-          </InfiniteWebsiteGrid>
+          </GroupedWebsiteGrid>
         </div>
 
         <EmptyState
@@ -135,14 +170,19 @@
  * @emits manageTags - 打开标签管理
  * @emits manageCategories - 打开分类管理
  */
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import WebsiteCard from '@/components/WebsiteCard.vue'
 import InfiniteWebsiteGrid from '@/components/InfiniteWebsiteGrid.vue'
+import GroupedWebsiteGrid from '@/components/GroupedWebsiteGrid.vue'
 import { EmptyState, BaseButton } from '@nav/ui'
 import { useWebsiteStore } from '@/stores/website'
 import { useCategoryStore } from '@/stores/category'
+import { useAuthStore } from '@/stores/auth'
+import { useHealthStore } from '@/stores/health'
 import { useWebsiteSearch } from '@/composables/useWebsiteSearch'
 import { useWebsiteDrag } from '@/composables/useWebsiteDrag'
+import { runHealthCheckBatch } from '@/api/admin'
+import { useUIStore } from '@/stores/ui'
 import type { Website } from '@/types'
 
 // Sub-components
@@ -163,6 +203,50 @@ const emit = defineEmits(['edit', 'delete', 'addSite', 'manageTags', 'manageCate
 
 const websiteStore = useWebsiteStore()
 const categoryStore = useCategoryStore()
+const authStore = useAuthStore()
+const healthStore = useHealthStore()
+const uiStore = useUIStore()
+
+const isAdmin = computed(() => authStore.user?.role === 'ADMIN')
+
+// ── 健康检测(管理员):循环分批调用,全部完成后刷新统计 ──────────────
+const healthChecking = ref(false)
+const healthProgressText = ref('')
+
+const formatCheckedAgo = (ts: number) => {
+  const diff = Date.now() - ts
+  if (diff < 60_000) return '刚刚'
+  if (diff < 3600_000) return `${Math.floor(diff / 60_000)} 分钟前`
+  if (diff < 86400_000) return `${Math.floor(diff / 3600_000)} 小时前`
+  return `${Math.floor(diff / 86400_000)} 天前`
+}
+
+const runHealthCheck = async () => {
+  if (healthChecking.value) return
+  healthChecking.value = true
+  try {
+    let cursor = 0
+    let done = false
+    while (!done) {
+      const res = await runHealthCheckBatch(cursor)
+      if (!res.success || !res.data) throw new Error(res.message || '检测失败')
+      done = res.data.done
+      cursor = res.data.nextCursor
+      healthProgressText.value = `${cursor}/${res.data.total}`
+    }
+    await healthStore.fetchStats()
+    uiStore.showToast('健康检测完成', 'success')
+  } catch {
+    uiStore.showToast('健康检测失败,请稍后重试', 'error')
+  } finally {
+    healthChecking.value = false
+    healthProgressText.value = ''
+  }
+}
+
+onMounted(() => {
+  void healthStore.fetchStats()
+})
 
 // 使用组合式函数
 const {
@@ -237,6 +321,45 @@ const onFavoriteToggle = (websiteId: string) => {
 .main-content {
   flex: 1;
   min-width: 0;
+}
+
+/* 站点统计条 */
+.stats-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 14px;
+  margin-bottom: 14px;
+  border: 1px solid var(--border-tile);
+  border-radius: 12px;
+  background: var(--bg-panel);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.stats-item b {
+  color: var(--text-main);
+  font-weight: var(--font-weight-bold);
+}
+
+.stats-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.stats-checked {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.stats-spacer {
+  flex: 1;
+}
+
+.health-check-btn {
+  flex: 0 0 auto;
 }
 
 .search-results-section {

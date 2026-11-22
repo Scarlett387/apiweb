@@ -11,6 +11,7 @@ import {
   adminAuditLogService,
   syncService,
   iconService,
+  navCommunityService,
   databaseClient
 } from '../services.js'
 import { toUserDto } from '../lib/dto.js'
@@ -178,6 +179,133 @@ const adminRoutes: FastifyPluginAsyncZod = async app => {
           done
         }
       }
+    }
+  )
+
+  // ── 站点健康批量检测 ──────────────────────────────────────────────
+  // 每次调用检测一小批(Workers 子请求限额),前端循环调用直到 done。
+  // 判定:2xx-4xx 都算在线(4xx 说明服务器活着);网络错误/超时/5xx 视情况——
+  // 5xx 也算服务器活着但异常,记离线更直观。超时 8s。
+  const healthCheckBodySchema = z.object({
+    cursor: z.coerce.number().int().min(0).default(0),
+    batch: z.coerce.number().int().min(1).max(20).default(12)
+  })
+
+  const probeUrl = async (url: string): Promise<{ online: boolean; latencyMs: number | null }> => {
+    const started = Date.now()
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 8000)
+    try {
+      const res = await fetch(url, {
+        method: 'GET',
+        redirect: 'follow',
+        signal: controller.signal,
+        headers: { 'user-agent': 'Mozilla/5.0 (compatible; NavHealthCheck/1.0)' }
+      })
+      // 2xx/3xx/4xx = 服务器有响应 = 在线;5xx = 服务异常 = 离线
+      return { online: res.status < 500, latencyMs: Date.now() - started }
+    } catch {
+      return { online: false, latencyMs: null }
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
+  app.post(
+    '/admin/health/check',
+    { onRequest: [app.authenticate], schema: { body: healthCheckBodySchema } },
+    async req => {
+      await requireAdmin(req.user.sub)
+
+      const owner = await databaseClient.first<{ user_id: string }>(
+        `SELECT user_id FROM user_sync_state
+         WHERE enabled = 1 AND current_storage_key IS NOT NULL
+         ORDER BY updated_at DESC LIMIT 1`
+      )
+      if (!owner) {
+        throw new AppError('站主尚未发布导航数据', 'NO_PUBLIC_DATA', 404)
+      }
+
+      const snapshot = await syncService.getSnapshot(owner.user_id)
+      if (!snapshot) {
+        throw new AppError('无法读取站主快照', 'NO_SNAPSHOT', 404)
+      }
+
+      const websites = snapshot.data.websites.filter(
+        (w): w is typeof w & { url: string } => typeof w.url === 'string' && w.url.length > 0
+      )
+      const { cursor, batch } = req.body
+      const slice = websites.slice(cursor, cursor + batch)
+
+      const results: Array<{ url: string; online: boolean; latencyMs: number | null }> = []
+      // 并发探测本批(小批量并发安全)
+      await Promise.all(
+        slice.map(async w => {
+          const r = await probeUrl(w.url)
+          results.push({ url: w.url, ...r })
+        })
+      )
+      if (results.length > 0) {
+        await navCommunityService.upsertHealthResults(results)
+      }
+
+      const nextCursor = cursor + slice.length
+      return {
+        success: true,
+        data: {
+          processed: slice.length,
+          online: results.filter(r => r.online).length,
+          nextCursor,
+          total: websites.length,
+          done: nextCursor >= websites.length
+        }
+      }
+    }
+  )
+
+  // ── 访客投稿审核 ──────────────────────────────────────────────────
+  app.get('/admin/submissions', { onRequest: [app.authenticate] }, async req => {
+    await requireAdmin(req.user.sub)
+    const submissions = await navCommunityService.listSubmissions()
+    const pending = await navCommunityService.pendingCount()
+    return {
+      success: true,
+      data: {
+        pending,
+        submissions: submissions.map(s => ({
+          id: s.id,
+          name: s.name,
+          url: s.url,
+          description: s.description,
+          contact: s.contact,
+          status: s.status,
+          createdAt: s.created_at
+        }))
+      }
+    }
+  })
+
+  const reviewSubmissionSchema = z.object({
+    id: z.string().trim().min(1).max(64),
+    action: z.enum(['approve', 'reject'])
+  })
+
+  app.post(
+    '/admin/submissions/review',
+    { onRequest: [app.authenticate], schema: { body: reviewSubmissionSchema } },
+    async (req, reply) => {
+      await requireAdmin(req.user.sub)
+      await navCommunityService.reviewSubmission(req.body.id, req.body.action)
+      void adminAuditLogService.log({
+        actorUserId: req.user.sub,
+        actorEmail: req.user.email,
+        action: 'ADMIN_SUBMISSION_REVIEW',
+        targetType: 'submission',
+        targetId: req.body.id,
+        summary: `投稿审核:${req.body.action === 'approve' ? '通过' : '拒绝'}(${req.body.id})`,
+        ip: req.ip
+      })
+      return reply.send({ success: true })
     }
   )
 

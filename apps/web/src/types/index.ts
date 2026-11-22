@@ -39,6 +39,7 @@ export interface ModalState {
   aiSettings: boolean
   syncConflict: boolean
   syncRecovery: boolean
+  submitSite: boolean
 }
 
 export type AccountPanelTab = 'account' | 'data' | 'ai' | 'settings' | 'admin'

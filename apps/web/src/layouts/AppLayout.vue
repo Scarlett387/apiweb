@@ -11,6 +11,10 @@
     <main class="main-content">
       <div class="container">
         <slot />
+        <!-- 页脚:数据来源与免责声明 -->
+        <footer class="site-footer">
+          <span>本站为个人导航分享,收录内容来自公开网络,不对第三方站点服务质量负责。</span>
+        </footer>
       </div>
     </main>
 
@@ -75,6 +79,15 @@
     </BaseModal>
 
     <BaseModal
+      v-if="uiStore.modalState.submitSite"
+      :is-open="uiStore.modalState.submitSite"
+      title="推荐站点"
+      @close="() => uiStore.closeModal('submitSite')"
+    >
+      <SubmitSiteModal @close="() => uiStore.closeModal('submitSite')" />
+    </BaseModal>
+
+    <BaseModal
       v-if="uiStore.modalState.accountPanel"
       :is-open="uiStore.modalState.accountPanel"
       title="账户与设置"
@@ -100,6 +113,7 @@ import HeaderBar from '@/components/header/HeaderBar.vue'
 import AddSiteModal from '@/components/modals/AddSiteModal.vue'
 import ManageCategoriesModal from '@/components/modals/ManageCategoriesModal.vue'
 import ManageTagsModal from '@/components/modals/ManageTagsModal.vue'
+import SubmitSiteModal from '@/components/modals/SubmitSiteModal.vue'
 import AccountPanelModal from '@/components/modals/AccountPanelModal.vue'
 import ToastContainer from '@/components/toast/ToastContainer.vue'
 import type { AccountPanelTab } from '@/types'
@@ -253,6 +267,15 @@ watch(
   max-width: 1280px;
   margin: 0 auto;
   padding: 0 var(--spacing-md);
+}
+
+.site-footer {
+  margin-top: 28px;
+  padding: 14px 0 4px;
+  border-top: 1px solid var(--color-border);
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .discard-confirm-content {

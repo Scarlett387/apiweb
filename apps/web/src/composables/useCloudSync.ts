@@ -735,9 +735,13 @@ export function useCloudSync() {
       const sharedCats = uiStore.sharedCategoryIds
       const sharedTags = uiStore.sharedTagIds
       const anonymousData = {
-        websites: rawAnonymousData.websites.filter(w => !sharedSites.has(w.id)),
-        categories: rawAnonymousData.categories.filter(c => !sharedCats.has(c.id)),
-        tags: rawAnonymousData.tags.filter(t => !sharedTags.has(t.id))
+        websites: rawAnonymousData.websites.filter(w =>
+          sharedSites ? !sharedSites.has(w.id ?? '') : true
+        ),
+        categories: rawAnonymousData.categories.filter(c =>
+          sharedCats ? !sharedCats.has(c.id ?? '') : true
+        ),
+        tags: rawAnonymousData.tags.filter(t => (sharedTags ? !sharedTags.has(t.id ?? '') : true))
       }
       const userOwner = { kind: 'user' as const, userId: expectedUserId }
       const userData = readWorkspaceData(userOwner)

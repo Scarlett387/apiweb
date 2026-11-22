@@ -110,6 +110,81 @@
         </div>
       </div>
     </section>
+    <!-- 投稿审核（仅管理员可见） -->
+    <section v-if="showSiteAdmin" class="prefs-card">
+      <div class="prefs-card__body">
+        <div class="preference-row">
+          <div class="launch__copy">
+            <div class="launch__title">
+              访客投稿审核
+              <span v-if="subPending > 0" class="reg-status">{{ subPending }} 条待审</span>
+            </div>
+            <div class="launch__hint">
+              访客通过顶栏「推荐站点」提交;通过后自动加入所选分类并云同步
+            </div>
+          </div>
+          <button
+            type="button"
+            class="icon-refresh-btn"
+            :disabled="subLoading"
+            title="刷新投稿列表"
+            @click="loadSubmissions"
+          >
+            <i class="fas fa-sync-alt" :class="{ 'fa-spin': subLoading }" />
+          </button>
+        </div>
+
+        <div v-if="subError" class="sub-error">{{ subError }}</div>
+        <p v-else-if="submissions.length === 0" class="sub-empty">
+          暂无投稿。访客推荐站点后会出现在这里。
+        </p>
+
+        <ul v-else class="sub-list">
+          <li v-for="sub in submissions" :key="sub.id" class="sub-item" :class="`is-${sub.status}`">
+            <div class="sub-item__main">
+              <div class="sub-item__title">
+                <span class="sub-item__name">{{ sub.name }}</span>
+                <span
+                  v-if="sub.status !== 'pending'"
+                  class="sub-item__badge"
+                  :class="`sub-item__badge--${sub.status}`"
+                >
+                  {{ sub.status === 'approved' ? '已通过' : '已拒绝' }}
+                </span>
+              </div>
+              <a class="sub-item__url" :href="sub.url" target="_blank" rel="noopener noreferrer">
+                {{ sub.url }}
+              </a>
+              <p v-if="sub.description" class="sub-item__desc">{{ sub.description }}</p>
+              <p v-if="sub.contact" class="sub-item__contact">联系方式:{{ sub.contact }}</p>
+            </div>
+            <div v-if="sub.status === 'pending'" class="sub-item__actions">
+              <select v-model="subTargetCategory[sub.id]" class="sub-category-select">
+                <option v-for="c in publicCategories" :key="c.id" :value="c.id">
+                  {{ c.name }}
+                </option>
+              </select>
+              <button
+                type="button"
+                class="sub-btn sub-btn--approve"
+                :disabled="subActing"
+                @click="approveSubmission(sub)"
+              >
+                通过
+              </button>
+              <button
+                type="button"
+                class="sub-btn sub-btn--reject"
+                :disabled="subActing"
+                @click="rejectSubmission(sub)"
+              >
+                拒绝
+              </button>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </section>
     <!-- 背景壁纸（毛玻璃模式） -->
     <section class="prefs-card">
       <div class="prefs-card__body">
@@ -177,15 +252,26 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
-import { getSiteSettings, updateSiteSettings, refreshIconsBatch } from '@/api/admin'
+import { useWebsiteStore } from '@/stores/website'
+import { useCategoryStore } from '@/stores/category'
+import {
+  getSiteSettings,
+  updateSiteSettings,
+  refreshIconsBatch,
+  getSubmissions,
+  reviewSubmission,
+  type SiteSubmission
+} from '@/api/admin'
 
 const store = useSettingsStore()
 const authStore = useAuthStore()
 const uiStore = useUIStore()
+const websiteStore = useWebsiteStore()
+const categoryStore = useCategoryStore()
 
 const current = store.settings.defaultHome
 const validDefault = (['home', 'all'].includes(current || '') ? current : 'home') as 'home' | 'all'
@@ -258,6 +344,91 @@ onMounted(async () => {
     regLoading.value = false
   }
 })
+
+// ── 访客投稿审核（仅管理员可见） ─────────────
+const submissions = ref<SiteSubmission[]>([])
+const subPending = ref(0)
+const subLoading = ref(false)
+const subError = ref('')
+const subActing = ref(false)
+const subTargetCategory = reactive<Record<string, string>>({})
+
+const publicCategories = computed(() => categoryStore.categories)
+
+const loadSubmissions = async () => {
+  subLoading.value = true
+  subError.value = ''
+  try {
+    const res = await getSubmissions()
+    if (res.success && res.data) {
+      submissions.value = res.data.submissions
+      subPending.value = res.data.pending
+      // 默认目标分类:第一个分类
+      for (const s of submissions.value) {
+        if (!subTargetCategory[s.id]) {
+          subTargetCategory[s.id] = categoryStore.categories[0]?.id || ''
+        }
+      }
+    } else {
+      subError.value = '投稿列表加载失败'
+    }
+  } catch {
+    subError.value = '投稿列表加载失败,请稍后重试'
+  } finally {
+    subLoading.value = false
+  }
+}
+
+watch(showSiteAdmin, open => {
+  if (open) void loadSubmissions()
+})
+
+const approveSubmission = async (sub: SiteSubmission) => {
+  if (subActing.value) return
+  const categoryId = subTargetCategory[sub.id]
+  if (!categoryId) {
+    uiStore.showToast('请先选择一个分类', 'warning')
+    return
+  }
+  subActing.value = true
+  try {
+    await reviewSubmission(sub.id, 'approve')
+    // 通过即入库:加入所选分类(登录状态下会自动云同步)
+    const now = new Date()
+    await websiteStore.addWebsite({
+      name: sub.name,
+      url: sub.url,
+      description: sub.description || '',
+      categoryId,
+      tagIds: [],
+      createdAt: now,
+      updatedAt: now,
+      visitCount: 0,
+      isOnline: true,
+      isFavorite: false
+    })
+    uiStore.showToast(`已通过「${sub.name}」并加入导航`, 'success')
+    await loadSubmissions()
+  } catch {
+    uiStore.showToast('操作失败,请重试', 'error')
+  } finally {
+    subActing.value = false
+  }
+}
+
+const rejectSubmission = async (sub: SiteSubmission) => {
+  if (subActing.value) return
+  subActing.value = true
+  try {
+    await reviewSubmission(sub.id, 'reject')
+    uiStore.showToast(`已拒绝「${sub.name}」`, 'info')
+    await loadSubmissions()
+  } catch {
+    uiStore.showToast('操作失败,请重试', 'error')
+  } finally {
+    subActing.value = false
+  }
+}
 
 const toggleRegistration = async () => {
   if (regSaving.value) return
@@ -369,6 +540,140 @@ const startIconRefresh = async () => {
   &:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+  }
+}
+
+/* 投稿审核列表 */
+.sub-error,
+.sub-empty {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.sub-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.sub-item {
+  padding: 10px 12px;
+  border: 1px solid var(--border-tile);
+  border-radius: 12px;
+  background: var(--bg-tile);
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+
+  &.is-rejected {
+    opacity: 0.55;
+  }
+}
+
+.sub-item__main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.sub-item__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sub-item__name {
+  font-size: 14px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-main);
+}
+
+.sub-item__badge {
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-weight: 600;
+
+  &--approved {
+    color: #15803d;
+    background: rgba(34, 197, 94, 0.14);
+  }
+
+  &--rejected {
+    color: #b91c1c;
+    background: rgba(239, 68, 68, 0.14);
+  }
+}
+
+.sub-item__url {
+  font-size: 12px;
+  color: var(--color-primary);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.sub-item__desc,
+.sub-item__contact {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.sub-item__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.sub-category-select {
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border-tile);
+  background: var(--bg-panel);
+  color: var(--text-main);
+  max-width: 130px;
+}
+
+.sub-btn {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &--approve {
+    background: var(--color-primary);
+    color: #fff;
+  }
+
+  &--reject {
+    background: transparent;
+    color: var(--color-error);
+    border: 1px solid color-mix(in srgb, var(--color-error) 40%, transparent);
   }
 }
 

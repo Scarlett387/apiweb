@@ -225,6 +225,48 @@ export const refreshIconsBatch = (cursor: number, batch = 8) =>
   request.post<IconRefreshResult>('/api/admin/icons/refresh', { cursor, batch })
 
 // ─────────────────────────────────────────────
+//  Health Check（站点健康批量检测，游标分批）
+// ─────────────────────────────────────────────
+
+export interface HealthCheckResult {
+  processed: number
+  online: number
+  nextCursor: number
+  total: number
+  done: boolean
+}
+
+/** POST /admin/health/check —— 每次检测一小批站点，循环调用直到 done */
+export const runHealthCheckBatch = (cursor: number, batch = 12) =>
+  request.post<HealthCheckResult>('/api/admin/health/check', { cursor, batch })
+
+// ─────────────────────────────────────────────
+//  Submissions（访客投稿审核）
+// ─────────────────────────────────────────────
+
+export interface SiteSubmission {
+  id: string
+  name: string
+  url: string
+  description: string | null
+  contact: string | null
+  status: 'pending' | 'approved' | 'rejected'
+  createdAt: number
+}
+
+export interface SubmissionListResult {
+  pending: number
+  submissions: SiteSubmission[]
+}
+
+/** GET /admin/submissions */
+export const getSubmissions = () => request.get<SubmissionListResult>('/api/admin/submissions')
+
+/** POST /admin/submissions/review */
+export const reviewSubmission = (id: string, action: 'approve' | 'reject') =>
+  request.post<{ success: boolean }>('/api/admin/submissions/review', { id, action })
+
+// ─────────────────────────────────────────────
 //  Admin Audit Logs
 // ─────────────────────────────────────────────
 
@@ -236,6 +278,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   ADMIN_STORAGE_CONFIG_UPDATE: '存储配置更新',
   ADMIN_STORAGE_CONNECTION_TEST: '存储连接测试',
   ADMIN_SITE_SETTINGS_UPDATE: '站点配置更新',
+  ADMIN_SUBMISSION_REVIEW: '投稿审核',
   AUTH_LOGIN_SUCCESS: '登录成功',
   AUTH_LOGIN_FAILED: '登录失败',
   AUTH_PASSWORD_RESET: '密码重置成功'

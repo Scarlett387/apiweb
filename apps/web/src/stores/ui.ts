@@ -19,7 +19,8 @@ export const useUIStore = defineStore('ui', () => {
     dataManagement: false,
     aiSettings: false,
     syncConflict: false,
-    syncRecovery: false
+    syncRecovery: false,
+    submitSite: false
   })
 
   const modalData = ref<Partial<ModalPayloads>>({})

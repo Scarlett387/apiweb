@@ -7,7 +7,7 @@
  */
 import { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
-import { databaseClient } from '../services.js'
+import { databaseClient, navCommunityService } from '../services.js'
 
 interface SyncStateRecord {
   user_id: string
@@ -51,6 +51,123 @@ const publicRoutes: FastifyPluginAsyncZod = async app => {
         success: false,
         code: 'BING_FETCH_FAILED',
         message: '获取必应每日图片失败'
+      })
+    }
+  })
+
+  // ── 站点统计 + 健康状态 ────────────────────────────────────────────
+  // 统计条(收录数/在线数)与卡片状态点共用,60s 缓存。
+  app.get('/public/stats', async (_req, reply) => {
+    try {
+      const state = await databaseClient.first<SyncStateRecord>(
+        `SELECT user_id, current_storage_key FROM user_sync_state
+         WHERE enabled = 1 AND current_storage_key IS NOT NULL
+         ORDER BY updated_at DESC LIMIT 1`
+      )
+      if (!state?.current_storage_key) {
+        return reply.header('cache-control', 'public, max-age=60').send({
+          success: true,
+          data: { total: 0, online: 0, checkedAt: null, items: [] }
+        })
+      }
+      const row = await databaseClient.first<BlobRow>(
+        'SELECT content FROM storage_blobs WHERE key = ?',
+        [state.current_storage_key]
+      )
+      if (!row) {
+        return reply.header('cache-control', 'public, max-age=60').send({
+          success: true,
+          data: { total: 0, online: 0, checkedAt: null, items: [] }
+        })
+      }
+      const snapshot = JSON.parse(row.content) as {
+        data?: Record<string, Array<Record<string, unknown>>>
+      }
+      const websites = Array.isArray(snapshot.data?.websites) ? snapshot.data!.websites : []
+      const urls = websites.map(w => String(w.url || '')).filter(Boolean)
+      const health = await navCommunityService.getHealthByUrl(urls)
+      // 分类级公开开关:隐匿分类的站不进公开统计
+      const categories = Array.isArray(snapshot.data?.categories) ? snapshot.data!.categories : []
+      const hiddenCategoryIds = new Set(
+        categories.filter(c => c.isPublic === false).map(c => String(c.id))
+      )
+      const publicWebsites = websites.filter(w => !hiddenCategoryIds.has(String(w.categoryId)))
+      const publicUrls = new Set(publicWebsites.map(w => String(w.url || '')))
+      const items = publicWebsites
+        .map(w => {
+          const url = String(w.url || '')
+          const h = health[url]
+          return h ? { url, online: h.online, latencyMs: h.latencyMs } : null
+        })
+        .filter((x): x is { url: string; online: boolean; latencyMs: number | null } => !!x)
+      const online = items.filter(i => i.online).length
+      const checkedAt =
+        items.length > 0
+          ? Math.max(...items.map(i => health[String(i.url)]?.checkedAt ?? 0)) || null
+          : null
+      return reply.header('cache-control', 'public, max-age=60').send({
+        success: true,
+        data: {
+          total: publicUrls.size,
+          online,
+          checkedAt,
+          items
+        }
+      })
+    } catch (err) {
+      _req.log.warn({ err }, 'Public stats fetch failed')
+      return reply.header('cache-control', 'public, max-age=60').send({
+        success: true,
+        data: { total: 0, online: 0, checkedAt: null, items: [] }
+      })
+    }
+  })
+
+  // ── 访客投稿 ──────────────────────────────────────────────────────
+  const submitSchema = z.object({
+    name: z.string().trim().min(1, '站点名称不能为空').max(100),
+    url: z
+      .string()
+      .trim()
+      .min(1, '网址不能为空')
+      .max(2000)
+      .refine(v => /^https?:\/\/.+/i.test(v), { message: '网址必须以 http(s):// 开头' }),
+    description: z.string().trim().max(200).optional(),
+    contact: z.string().trim().max(100).optional()
+  })
+
+  app.post('/public/submit', { schema: { body: submitSchema } }, async (req, reply) => {
+    try {
+      const { id } = await navCommunityService.addSubmission({
+        name: req.body.name,
+        url: req.body.url,
+        description: req.body.description ?? null,
+        contact: req.body.contact ?? null,
+        ip: req.ip
+      })
+      req.log.info({ submissionId: id }, 'Visitor submitted site')
+      return reply.send({ success: true, message: '投稿已提交,感谢推荐!' })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      if (msg === 'DUPLICATE_SUBMISSION') {
+        return reply.code(409).send({
+          success: false,
+          code: 'DUPLICATE_SUBMISSION',
+          message: '这个网址最近已经推荐过啦,请耐心等待站长审核'
+        })
+      }
+      if (msg === 'RATE_LIMITED') {
+        return reply.code(429).send({
+          success: false,
+          code: 'RATE_LIMITED',
+          message: '投稿太频繁了,请稍后再试'
+        })
+      }
+      req.log.warn({ err }, 'Visitor submission failed')
+      return reply.code(500).send({
+        success: false,
+        code: 'INTERNAL_ERROR',
+        message: '提交失败,请稍后重试'
       })
     }
   })

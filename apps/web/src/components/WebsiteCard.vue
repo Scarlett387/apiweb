@@ -48,6 +48,16 @@
         <!-- 网站名称 -->
         <div class="website-card__title-section">
           <h3 :id="titleId" class="website-card__title" :title="website.name">
+            <span
+              v-if="health"
+              class="website-card__health-dot"
+              :class="health.online ? 'is-online' : 'is-offline'"
+              :title="
+                health.online
+                  ? `在线${health.latencyMs != null ? ` · ${health.latencyMs}ms` : ''}`
+                  : '失联'
+              "
+            />
             <a
               :href="website.url"
               target="_blank"
@@ -140,6 +150,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useTagStore } from '@/stores/tag'
+import { useHealthStore } from '@/stores/health'
 import type { Website, Tag } from '@/types'
 import { formatVisitCountCompact, formatDateTimeZh, formatLastVisitedZh } from '@/utils/helpers'
 import WebsiteCardActions from '@/components/WebsiteCardActions.vue'
@@ -160,6 +171,10 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<Emits>()
 
 const uiStore = useUIStore()
+const healthStore = useHealthStore()
+
+// 健康状态点:管理员检测过后才有数据,未检测不显示
+const health = computed(() => healthStore.getHealth(props.website.url))
 
 // 访客（未登录）：云端分享的网站只读，本地新增的网站可管理
 const canManage = computed(
@@ -451,6 +466,27 @@ setupFaviconObserver()
   line-height: var(--line-height-tight);
   color: var(--text-main);
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 健康状态点:绿=在线,红=失联;未检测不渲染 */
+.website-card__health-dot {
+  flex: 0 0 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+
+  &.is-online {
+    background: #22c55e;
+    box-shadow: 0 0 0 2.5px rgba(34, 197, 94, 0.18);
+  }
+
+  &.is-offline {
+    background: #ef4444;
+    box-shadow: 0 0 0 2.5px rgba(239, 68, 68, 0.18);
+  }
 }
 
 .website-card__title-link {

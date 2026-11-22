@@ -54,7 +54,7 @@ export function useDataSync() {
     if (visitorHydrated) return
     visitorHydrated = true
     try {
-      const res = await request.get<{ data: PublicNavPayload }>('/api/public/nav')
+      const res = await request.get<PublicNavPayload>('/api/public/nav')
       if (res?.success && res.data) {
         const { websites, categories, tags } = res.data
         if (Array.isArray(websites)) {
