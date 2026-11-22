@@ -74,6 +74,7 @@ export type NormalizedSyncTag = {
   id: string
   name: string
   color: string
+  icon: string
   order: number
 }
 
@@ -120,6 +121,7 @@ const normalizeTag = (tag: Partial<Tag>): NormalizedSyncTag => ({
   id: str(tag.id),
   name: str(tag.name),
   color: str(tag.color),
+  icon: str(tag.icon),
   order: num(tag.order, 0)
 })
 

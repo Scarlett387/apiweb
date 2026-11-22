@@ -88,6 +88,19 @@
               class="website-card__tag"
               :title="tag.name"
             >
+              <span
+                v-if="tag.icon && !/^(fas|far|fab|fa)[\s-]/.test(tag.icon)"
+                class="website-card__tag-icon"
+                aria-hidden="true"
+              >
+                {{ tag.icon }}
+              </span>
+              <i
+                v-else-if="tag.icon"
+                :class="tag.icon"
+                class="website-card__tag-icon"
+                aria-hidden="true"
+              />
               {{ tag.name }}
             </span>
             <span
@@ -529,6 +542,12 @@ setupFaviconObserver()
   display: flex;
   flex-wrap: wrap;
   gap: var(--spacing-xs);
+}
+
+.website-card__tag-icon {
+  font-size: 11px;
+  line-height: 1;
+  margin-right: 3px;
 }
 
 .website-card__tag {

@@ -1,34 +1,41 @@
 <template>
   <div class="tag-item" :class="{ 'is-dragging': isDragging }" @dragover.prevent @drop="onDrop">
-    <div v-if="editing" class="edit-row">
-      <BaseInput
-        v-model="name"
-        placeholder="标签名称"
-        size="sm"
-        class="tag-input"
-        auto-focus
-        @keyup.enter="onSave"
-      />
-      <ColorPicker v-model="color" />
-      <div class="action-buttons">
-        <BaseButton
-          variant="ghost"
+    <div v-if="editing" class="edit-col">
+      <div class="edit-row">
+        <BaseInput
+          v-model="name"
+          placeholder="标签名称"
           size="sm"
-          icon="fas fa-check"
-          title="保存"
-          aria-label="保存标签"
-          :disabled="!name.trim()"
-          :loading="updating"
-          @click="onSave"
+          class="tag-input"
+          auto-focus
+          @keyup.enter="onSave"
         />
-        <BaseButton
-          variant="ghost"
-          size="sm"
-          icon="fas fa-times"
-          title="取消"
-          aria-label="取消编辑标签"
-          @click="$emit('cancel')"
-        />
+        <ColorPicker v-model="color" />
+        <div class="action-buttons">
+          <BaseButton
+            variant="ghost"
+            size="sm"
+            icon="fas fa-check"
+            title="保存"
+            aria-label="保存标签"
+            :disabled="!name.trim()"
+            :loading="updating"
+            @click="onSave"
+          />
+          <BaseButton
+            variant="ghost"
+            size="sm"
+            icon="fas fa-times"
+            title="取消"
+            aria-label="取消编辑标签"
+            @click="$emit('cancel')"
+          />
+        </div>
+      </div>
+      <div class="edit-emoji-row">
+        <span class="edit-emoji-label">小图标</span>
+        <EmojiPicker v-model="icon" />
+        <span v-if="!icon" class="edit-emoji-hint">不选则显示色点</span>
       </div>
     </div>
     <div v-else class="view-row">
@@ -42,7 +49,11 @@
       >
         <i class="fas fa-grip-vertical" />
       </div>
-      <span class="color-dot" :style="{ backgroundColor: tag.color }" />
+      <span v-if="tag.icon" class="tag-icon" aria-hidden="true">
+        {{ isFontAwesome(tag.icon) ? '' : tag.icon }}
+        <i v-if="isFontAwesome(tag.icon)" :class="tag.icon" />
+      </span>
+      <span v-else class="color-dot" :style="{ backgroundColor: tag.color }" />
       <span class="name">{{ tag.name }}</span>
       <span class="count">{{ usageCount }}</span>
       <div v-if="canManage" class="item-actions">
@@ -71,6 +82,7 @@
 import { ref, watchEffect } from 'vue'
 import { BaseButton, BaseInput, ColorPicker } from '@nav/ui'
 import type { Tag } from '@/types'
+import EmojiPicker from './EmojiPicker.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -82,25 +94,31 @@ const props = withDefaults(
   }>(),
   { canManage: true }
 )
+
 const emit = defineEmits<{
   (e: 'edit'): void
   (e: 'delete'): void
-  (e: 'save', payload: { name: string; color: string }): void
+  (e: 'save', payload: { name: string; color: string; icon: string }): void
   (e: 'cancel'): void
   (e: 'dragstart', id: string): void
   (e: 'drop', id: string): void
 }>()
 
+/** FontAwesome 类名（fas/far/fab 开头）用 <i> 渲染，其余当 emoji 文本 */
+const isFontAwesome = (icon: string) => /^(fas|far|fab|fa)[\s-]/.test(icon)
+
 const name = ref('')
 const color = ref('#3B82F6')
+const icon = ref('')
 const isDragging = ref(false)
 
 watchEffect(() => {
   name.value = props.tag.name
   color.value = props.tag.color
+  icon.value = props.tag.icon || ''
 })
 
-const onSave = () => emit('save', { name: name.value.trim(), color: color.value })
+const onSave = () => emit('save', { name: name.value.trim(), color: color.value, icon: icon.value })
 
 const onDragStart = (e: DragEvent) => {
   isDragging.value = true
@@ -160,6 +178,43 @@ const onDrop = () => {
   display: flex;
   gap: 10px;
   align-items: center;
+}
+
+.edit-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.edit-emoji-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+
+  .edit-emoji-row :deep(.emoji-picker) {
+    flex: 1;
+  }
+}
+
+.edit-emoji-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex: 0 0 auto;
+}
+
+.edit-emoji-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.tag-icon {
+  font-size: 16px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
 }
 
 .drag-handle {

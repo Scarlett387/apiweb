@@ -70,6 +70,7 @@ export interface ModalPayloads {
     localStats: { websites: number; categories: number; tags: number }
     failedAt: Date
   }
+  submitSite?: undefined
 }
 
 export const ERROR_DUPLICATE_NAME = 'DUPLICATE_NAME'

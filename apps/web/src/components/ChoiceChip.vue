@@ -8,29 +8,40 @@
     :title="label"
     @click="emit('click')"
   >
+    <span v-if="icon" class="choice-chip__icon" aria-hidden="true">
+      <i v-if="iconLooksFa" :class="icon" />
+      {{ iconLooksFa ? '' : icon }}
+    </span>
     <span class="choice-chip__label">{{ label }}</span>
     <span v-if="count !== undefined" class="choice-chip__count">{{ count }}</span>
   </button>
 </template>
 
 <script setup lang="ts">
-withDefaults(
+import { computed } from 'vue'
+
+const props = withDefaults(
   defineProps<{
     label: string
     count?: number
     active?: boolean
     ariaLabel?: string
+    /** 可选小图标：emoji 或 FontAwesome 类名 */
+    icon?: string
   }>(),
   {
     count: undefined,
     active: false,
-    ariaLabel: undefined
+    ariaLabel: undefined,
+    icon: undefined
   }
 )
 
 const emit = defineEmits<{
   (e: 'click'): void
 }>()
+
+const iconLooksFa = computed(() => !!props.icon && /^(fas|far|fab|fa)[\s-]/.test(props.icon))
 </script>
 
 <style scoped lang="scss">
@@ -66,6 +77,14 @@ const emit = defineEmits<{
 .choice-chip--active {
   background: var(--primary-soft);
   color: var(--color-primary-dark);
+}
+
+.choice-chip__icon {
+  display: inline-flex;
+  align-items: center;
+  font-size: 13px;
+  line-height: 1;
+  margin-right: 2px;
 }
 
 .choice-chip__label {

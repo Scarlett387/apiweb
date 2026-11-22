@@ -33,6 +33,8 @@ export interface Tag {
   id: string
   name: string
   color: string
+  /** 标签小图标：emoji（如 🍬）或 FontAwesome 类名（如 fas fa-tag），缺省显示色点 */
+  icon?: string
   order: number
   usageCount: number
   createdAt: Date

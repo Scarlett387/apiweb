@@ -33,7 +33,7 @@ export const useTagStore = defineStore('tag', () => {
 
   const tagColors = computed(() => TAG_COLORS)
 
-  const addTag = (tagData: Pick<Tag, 'name' | 'color'>) => {
+  const addTag = (tagData: Pick<Tag, 'name' | 'color'> & { icon?: string }) => {
     const nameLower = tagData.name.trim().toLowerCase()
     if (tags.value.some(t => t.name.trim().toLowerCase() === nameLower))
       throw new Error('DUPLICATE_NAME')
@@ -111,6 +111,7 @@ export const useTagStore = defineStore('tag', () => {
         id: t.id || generateId(),
         name: t.name || '',
         color: t.color || TAG_COLORS[0],
+        icon: t.icon || '',
         order: typeof t.order === 'number' ? t.order : 0,
         usageCount: typeof t.usageCount === 'number' ? t.usageCount : 0,
         createdAt: t.createdAt ? new Date(t.createdAt) : now,

@@ -73,6 +73,10 @@
               </BaseButton>
             </div>
           </div>
+          <div class="form-emoji-row">
+            <span class="form-emoji-label">小图标</span>
+            <EmojiPicker v-model="newTag.icon" />
+          </div>
         </div>
       </div>
     </div>
@@ -115,6 +119,7 @@ import type { Tag } from '@/types'
 import { ERROR_DUPLICATE_NAME } from '@/types'
 import { computeReorderedIds } from '@/utils/helpers'
 import TagListItem from './parts/TagListItem.vue'
+import EmojiPicker from './parts/EmojiPicker.vue'
 
 // Store
 const tagStore = useTagStore()
@@ -132,7 +137,8 @@ const tagNameInputRef = ref()
 
 const newTag = ref({
   name: '',
-  color: '#3B82F6'
+  color: '#3B82F6',
+  icon: ''
 })
 
 const editingId = ref<string | null>(null)
@@ -183,13 +189,14 @@ const handleAddTag = async () => {
     }
     tagStore.addTag({
       name: newTag.value.name.trim(),
-      color: newTag.value.color
+      color: newTag.value.color,
+      icon: newTag.value.icon || undefined
     })
 
     uiStore.showToast('标签添加成功', 'success')
 
     // 重置表单
-    newTag.value = { name: '', color: '#3B82F6' }
+    newTag.value = { name: '', color: '#3B82F6', icon: '' }
     adding.value = false
   } catch (error) {
     if (error instanceof Error && error.message === ERROR_DUPLICATE_NAME) {
@@ -204,7 +211,7 @@ const handleAddTag = async () => {
 
 const cancelAdd = () => {
   adding.value = false
-  newTag.value = { name: '', color: '#3B82F6' }
+  newTag.value = { name: '', color: '#3B82F6', icon: '' }
 }
 
 // Watch adding state to focus input
@@ -222,7 +229,7 @@ const startEdit = (tag: Tag) => {
 }
 
 // 处理更新标签
-const handleSave = (payload: { name: string; color: string }) => {
+const handleSave = (payload: { name: string; color: string; icon: string }) => {
   if (!editingId.value || updating.value) return
   const name = payload.name.trim()
   const color = payload.color
@@ -237,7 +244,7 @@ const handleSave = (payload: { name: string; color: string }) => {
 
   updating.value = true
   try {
-    tagStore.updateTag(editingId.value, { name, color })
+    tagStore.updateTag(editingId.value, { name, color, icon: payload.icon || undefined })
     uiStore.showToast('标签更新成功', 'success')
     cancelEdit()
   } catch (error) {
@@ -363,6 +370,24 @@ const confirmDeleteTag = () => {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.form-emoji-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+
+  > .emoji-picker,
+  > :deep(.emoji-picker) {
+    flex: 1;
+  }
+}
+
+.form-emoji-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex: 0 0 auto;
 }
 
 .tag-input {

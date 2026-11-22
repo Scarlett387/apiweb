@@ -22,37 +22,38 @@
           >
             <!-- Inline Edit Mode -->
             <div v-if="editingId === category.id" class="category-item__edit">
-              <div class="edit-row">
-                <IconPicker
-                  :model-value="editingForm.icon"
-                  mode="popover"
-                  @update:model-value="editingForm.icon = $event"
-                />
-                <BaseInput
-                  v-model="editingForm.name"
-                  placeholder="分类名称"
-                  class="category-input"
-                  auto-focus
-                  @keyup.enter="handleUpdateCategory"
-                />
-                <div class="action-buttons">
-                  <BaseButton
-                    variant="ghost"
-                    size="sm"
-                    icon="fas fa-check"
-                    title="保存"
-                    aria-label="保存分类"
-                    :disabled="!editingForm.name.trim()"
-                    @click="handleUpdateCategory"
+              <div class="edit-col">
+                <div class="edit-row">
+                  <BaseInput
+                    v-model="editingForm.name"
+                    placeholder="分类名称"
+                    class="category-input"
+                    auto-focus
+                    @keyup.enter="handleUpdateCategory"
                   />
-                  <BaseButton
-                    variant="ghost"
-                    size="sm"
-                    icon="fas fa-times"
-                    title="取消"
-                    aria-label="取消编辑分类"
-                    @click="cancelEdit"
-                  />
+                  <div class="action-buttons">
+                    <BaseButton
+                      variant="ghost"
+                      size="sm"
+                      icon="fas fa-check"
+                      title="保存"
+                      aria-label="保存分类"
+                      :disabled="!editingForm.name.trim()"
+                      @click="handleUpdateCategory"
+                    />
+                    <BaseButton
+                      variant="ghost"
+                      size="sm"
+                      icon="fas fa-times"
+                      title="取消"
+                      aria-label="取消编辑分类"
+                      @click="cancelEdit"
+                    />
+                  </div>
+                </div>
+                <div class="edit-emoji-row">
+                  <span class="edit-emoji-label">图标</span>
+                  <EmojiPicker v-model="editingForm.icon" />
                 </div>
               </div>
             </div>
@@ -70,7 +71,10 @@
                 <i class="fas fa-grip-vertical" />
               </div>
               <div class="category-item__icon">
-                <i :class="category.icon || 'fas fa-folder'" />
+                <span v-if="category.icon && !/^(fas|far|fab|fa)[\s-]/.test(category.icon)">
+                  {{ category.icon }}
+                </span>
+                <i v-else :class="category.icon || 'fas fa-folder'" />
               </div>
               <div class="category-item__info">
                 <span class="category-item__name">{{ category.name }}</span>
@@ -134,8 +138,7 @@
         </BaseButton>
 
         <div v-else class="add-category-form">
-          <div class="form-row">
-            <IconPicker v-model="newCategoryIcon" mode="popover" />
+          <div class="add-category-form__row">
             <BaseInput
               v-model="newCategoryName"
               placeholder="分类名称"
@@ -154,6 +157,10 @@
               </BaseButton>
               <BaseButton variant="ghost" size="sm" @click="cancelAdd">取消</BaseButton>
             </div>
+          </div>
+          <div class="add-emoji-row">
+            <span class="add-emoji-label">图标</span>
+            <EmojiPicker v-model="newCategoryIcon" />
           </div>
         </div>
       </div>
@@ -192,7 +199,8 @@ import { useCategoryStore } from '@/stores/category'
 import { useWebsiteStore } from '@/stores/website'
 import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
-import { BaseInput, BaseButton, BaseModal, IconPicker, EmptyState } from '@nav/ui'
+import { BaseInput, BaseButton, BaseModal, EmptyState } from '@nav/ui'
+import EmojiPicker from './parts/EmojiPicker.vue'
 import type { Category } from '@/types'
 import { computeReorderedIds } from '@/utils/helpers'
 
@@ -207,7 +215,7 @@ const categories = computed(() =>
 )
 const isAdding = ref(false)
 const newCategoryName = ref('')
-const newCategoryIcon = ref('fas fa-folder')
+const newCategoryIcon = ref('')
 
 const showDeleteModal = ref(false)
 const categoryToDelete = ref<Category | null>(null)
@@ -244,21 +252,21 @@ const handleAddCategory = () => {
     icon: newCategoryIcon.value
   })
   newCategoryName.value = ''
-  newCategoryIcon.value = 'fas fa-folder'
+  newCategoryIcon.value = ''
   isAdding.value = false
 }
 
 const cancelAdd = () => {
   isAdding.value = false
   newCategoryName.value = ''
-  newCategoryIcon.value = 'fas fa-folder'
+  newCategoryIcon.value = ''
 }
 
 const startEdit = (category: Category) => {
   editingId.value = category.id
   editingForm.value = {
     name: category.name,
-    icon: category.icon || 'fas fa-folder'
+    icon: category.icon || ''
   }
 }
 
@@ -474,10 +482,50 @@ const onDrop = (e: DragEvent, targetCategory: Category) => {
   padding: 12px;
 }
 
-.form-row {
+.add-category-form__row {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.add-emoji-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+
+  > :deep(.emoji-picker) {
+    flex: 1;
+  }
+}
+
+.add-emoji-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex: 0 0 auto;
+}
+
+.edit-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.edit-emoji-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  > :deep(.emoji-picker) {
+    flex: 1;
+  }
+}
+
+.edit-emoji-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex: 0 0 auto;
 }
 
 .category-input {

@@ -32,6 +32,7 @@
           v-for="tag in tags"
           :key="tag.id"
           :label="tag.name"
+          :icon="tag.icon"
           :active="selectedTags.includes(tag.id)"
           :aria-label="`筛选标签：${tag.name}`"
           @click="$emit('toggleTag', tag.id)"
@@ -97,6 +98,10 @@
         >
           <span class="category-grip" aria-hidden="true">
             <i class="fas fa-grip-vertical" />
+          </span>
+          <span v-if="category.icon" class="category-icon" aria-hidden="true">
+            <i v-if="/^(fas|far|fab|fa)[\s-]/.test(category.icon)" :class="category.icon" />
+            <template v-else>{{ category.icon }}</template>
           </span>
           <span class="category-name">{{ category.name }}</span>
         </button>
@@ -332,6 +337,16 @@ const onCategoryDragEnd = () => {
   .category-item:hover & {
     opacity: 0.7;
   }
+}
+
+.category-icon {
+  flex-shrink: 0;
+  width: 16px;
+  font-size: 14px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .sidebar-empty-state {
