@@ -146,6 +146,24 @@ export const useWebsiteStore = defineStore('website', () => {
     bumpDataRevision()
   }
 
+  // 批量移动到分类（管理员批量整理用）
+  const batchMoveToCategory = (ids: string[], categoryId: string) => {
+    const now = new Date()
+    const idSet = new Set(ids)
+    let affectedCount = 0
+    const next = websites.value.map(website => {
+      if (!idSet.has(website.id) || website.categoryId === categoryId) return website
+      affectedCount += 1
+      return { ...website, categoryId, updatedAt: now }
+    })
+    if (affectedCount > 0) {
+      websites.value = next
+      saveToLocalStorage()
+      bumpDataRevision()
+    }
+    return affectedCount
+  }
+
   const removeCategoryFromWebsites = (categoryId: string) => {
     const now = new Date()
     let affectedCount = 0
@@ -371,6 +389,7 @@ export const useWebsiteStore = defineStore('website', () => {
     initializeData,
     addWebsite,
     updateWebsite,
+    batchMoveToCategory,
     removeCategoryFromWebsites,
     removeTagFromWebsites,
     deleteWebsite,

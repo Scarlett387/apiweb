@@ -58,7 +58,54 @@
             <i v-if="!healthChecking" class="fas fa-heart-pulse" />
             {{ healthChecking ? `检测中 ${healthProgressText}` : '健康检测' }}
           </BaseButton>
+          <BaseButton
+            v-if="isAdmin"
+            variant="ghost"
+            size="xs"
+            shape="rounded"
+            class="batch-mode-btn"
+            :class="{ 'is-on': uiStore.batchMode }"
+            :title="uiStore.batchMode ? '退出批量管理' : '勾选多个网站批量移动分类'"
+            @click="uiStore.toggleBatchMode()"
+          >
+            <i class="fas fa-object-group" />
+            {{ uiStore.batchMode ? '退出批量' : '批量管理' }}
+          </BaseButton>
         </div>
+
+        <!-- 批量操作条:勾选后浮现 -->
+        <Transition name="batch-bar">
+          <div v-if="isAdmin && uiStore.batchMode" class="batch-bar">
+            <span class="batch-bar__count">已选 {{ uiStore.selectedWebsiteIds.size }} 个</span>
+            <div class="batch-bar__actions">
+              <select
+                class="batch-bar__select"
+                aria-label="移动到分类"
+                value=""
+                @change="onBatchMove(($event.target as HTMLSelectElement).value)"
+              >
+                <option value="" disabled>移动到分类…</option>
+                <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
+              </select>
+              <BaseButton
+                variant="ghost"
+                size="xs"
+                shape="rounded"
+                @click="uiStore.clearSelectedWebsites()"
+              >
+                清空选择
+              </BaseButton>
+              <BaseButton
+                variant="ghost"
+                size="xs"
+                shape="rounded"
+                @click="uiStore.toggleBatchMode()"
+              >
+                退出
+              </BaseButton>
+            </div>
+          </div>
+        </Transition>
 
         <!-- Selected Conditions Bar -->
         <ActiveFiltersBar
@@ -248,6 +295,19 @@ onMounted(() => {
   void healthStore.fetchStats()
 })
 
+// ── 批量移动到分类(管理员) ────────────────────────────────────────
+const onBatchMove = (categoryId: string) => {
+  if (!categoryId || uiStore.selectedWebsiteIds.size === 0) return
+  const ids = [...uiStore.selectedWebsiteIds]
+  const moved = websiteStore.batchMoveToCategory(ids, categoryId)
+  const catName = categoryStore.categories.find(c => c.id === categoryId)?.name || '分类'
+  uiStore.clearSelectedWebsites()
+  uiStore.showToast(
+    moved > 0 ? `已将 ${moved} 个网站移动到「${catName}」` : '网站已在该分类',
+    'success'
+  )
+}
+
 // 使用组合式函数
 const {
   searchKeyword,
@@ -360,6 +420,68 @@ const onFavoriteToggle = (websiteId: string) => {
 
 .health-check-btn {
   flex: 0 0 auto;
+}
+
+.batch-mode-btn {
+  flex: 0 0 auto;
+
+  &.is-on {
+    background: var(--primary-soft);
+    color: var(--color-primary-dark, var(--color-primary));
+  }
+}
+
+.batch-bar {
+  position: sticky;
+  top: 12px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 8px 14px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 30%, var(--border-tile));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--bg-panel));
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  font-size: 13px;
+}
+
+.batch-bar__count {
+  font-weight: 600;
+  color: var(--text-main);
+  flex: 0 0 auto;
+}
+
+.batch-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.batch-bar__select {
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-tile);
+  background: var(--bg-panel);
+  color: var(--text-main);
+  font-size: 13px;
+  max-width: 180px;
+  cursor: pointer;
+}
+
+.batch-bar-enter-active,
+.batch-bar-leave-active {
+  transition: all 0.2s ease;
+}
+
+.batch-bar-enter-from,
+.batch-bar-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
 }
 
 .search-results-section {

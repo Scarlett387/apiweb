@@ -12,6 +12,19 @@
     @mouseenter="handleMouseEnter"
     @mouseleave="handleMouseLeave"
   >
+    <!-- 批量勾选框（批量管理模式下显示） -->
+    <button
+      v-if="uiStore.batchMode"
+      type="button"
+      class="batch-check"
+      :class="{ 'is-checked': uiStore.selectedWebsiteIds.has(website.id) }"
+      :aria-label="`选择 ${website.name}`"
+      :aria-pressed="uiStore.selectedWebsiteIds.has(website.id)"
+      @click.stop="uiStore.toggleSelectWebsite(website.id)"
+    >
+      <i v-if="uiStore.selectedWebsiteIds.has(website.id)" class="fas fa-check" />
+    </button>
+
     <!-- 拖拽手柄 (Top Right) -->
     <button
       class="drag-handle"
@@ -252,7 +265,8 @@ const cardClasses = computed(() => ({
   'website-card--hovered': isHovered.value,
   'website-card--loading': props.loading,
   'website-card--clickable': props.clickable,
-  [`website-card--${props.size}`]: props.size
+  [`website-card--${props.size}`]: props.size,
+  'is-batch-selected': uiStore.batchMode && uiStore.selectedWebsiteIds.has(props.website.id)
 }))
 
 const websiteTags = computed(() => {
@@ -604,6 +618,39 @@ setupFaviconObserver()
   transition:
     opacity var(--transition-fast),
     transform var(--transition-fast);
+}
+
+.batch-check {
+  position: absolute;
+  top: var(--spacing-md);
+  left: var(--spacing-md);
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--border-tile-hover, rgba(127, 127, 127, 0.4));
+  border-radius: 6px;
+  background: var(--bg-panel);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  z-index: 6;
+  transition: all var(--transition-fast);
+
+  &:hover {
+    border-color: var(--color-primary);
+  }
+
+  &.is-checked {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+  }
+}
+
+.website-card.is-batch-selected {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
 }
 
 .drag-handle {

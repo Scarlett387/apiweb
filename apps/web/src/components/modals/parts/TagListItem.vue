@@ -253,12 +253,8 @@ const onDrop = () => {
   display: flex;
   gap: 4px;
   margin-left: auto;
-  opacity: 0;
+  opacity: 1;
   transition: opacity 0.2s;
-
-  .tag-item:focus-within & {
-    opacity: 1;
-  }
 }
 
 .action-buttons {

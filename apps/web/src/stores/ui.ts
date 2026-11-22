@@ -47,6 +47,23 @@ export const useUIStore = defineStore('ui', () => {
     sharedTagIds.value = ids
   }
 
+  // 批量管理:登录用户开启后可勾选多张卡片批量移动分类
+  const batchMode = ref(false)
+  const selectedWebsiteIds = ref<Set<string>>(new Set())
+  const toggleBatchMode = () => {
+    batchMode.value = !batchMode.value
+    if (!batchMode.value) selectedWebsiteIds.value = new Set()
+  }
+  const toggleSelectWebsite = (id: string) => {
+    const next = new Set(selectedWebsiteIds.value)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    selectedWebsiteIds.value = next
+  }
+  const clearSelectedWebsites = () => {
+    selectedWebsiteIds.value = new Set()
+  }
+
   const openModal = <K extends keyof ModalState>(modalName: K, data?: ModalPayloads[K]) => {
     modalState.value[modalName] = true
     if (data !== undefined) modalData.value[modalName] = data
@@ -113,6 +130,11 @@ export const useUIStore = defineStore('ui', () => {
     sidebarOpen,
     isVisitor,
     setVisitorMode,
+    batchMode,
+    toggleBatchMode,
+    selectedWebsiteIds,
+    toggleSelectWebsite,
+    clearSelectedWebsites,
     sharedWebsiteIds,
     setSharedWebsiteIds,
     sharedCategoryIds,
